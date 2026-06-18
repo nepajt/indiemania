@@ -140,7 +140,8 @@ canvas {
 }
 
 .action,
-.start {
+.start,
+.fullscreen {
   border-radius: 999px;
   font-size: 18px;
 }
@@ -161,6 +162,12 @@ canvas {
   border-radius: 8px;
   color: #221916;
   background: rgba(244, 196, 79, 0.9);
+}
+
+.fullscreen {
+  grid-column: 1 / 3;
+  border-radius: 8px;
+  font-size: 14px;
 }
 
 .controls {
@@ -253,7 +260,8 @@ canvas {
   }
 
   .action,
-  .start {
+  .start,
+  .fullscreen {
     font-size: 14px;
   }
 
@@ -262,4 +270,110 @@ canvas {
     height: 50px;
     margin-top: -8px;
   }
+}
+
+@media (hover: none) and (orientation: landscape) {
+  :root {
+    --frame-padding: 0px;
+    --frame-border: 0px;
+    --shell-gap: 0px;
+    --height-gap: 0px;
+    --game-w: min(100vw, 150dvh);
+  }
+
+  body {
+    background: #000;
+  }
+
+  .shell {
+    padding: 0;
+    align-items: center;
+    justify-items: center;
+  }
+
+  .cabinet {
+    width: var(--game-w);
+  }
+
+  .screen-frame {
+    border: 0;
+    box-shadow: none;
+  }
+
+  .mobile-pad {
+    left: max(8px, env(safe-area-inset-left));
+    bottom: max(8px, env(safe-area-inset-bottom));
+    width: 96px;
+    height: 96px;
+  }
+
+  .pad {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    font-size: 14px;
+    border-width: 1px;
+  }
+
+  .pad.up,
+  .pad.down {
+    left: 32px;
+  }
+
+  .pad.left,
+  .pad.right {
+    top: 32px;
+  }
+
+  .mobile-actions {
+    right: max(8px, env(safe-area-inset-right));
+    bottom: max(8px, env(safe-area-inset-bottom));
+    grid-template-columns: repeat(5, 38px);
+    grid-auto-rows: 34px;
+    gap: 5px;
+  }
+
+  .touch-control {
+    border-width: 1px;
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+      0 2px 0 rgba(0, 0, 0, 0.48);
+  }
+
+  .action,
+  .start,
+  .fullscreen {
+    font-size: 12px;
+  }
+
+  .action.primary {
+    width: 40px;
+    height: 40px;
+    margin-top: -5px;
+  }
+
+  .action.small {
+    font-size: 11px;
+  }
+
+  .start {
+    grid-column: 4 / 6;
+  }
+
+  .fullscreen {
+    grid-column: 1 / 3;
+  }
+}
+
+.screen-frame:fullscreen {
+  display: grid;
+  place-items: center;
+  width: 100vw;
+  height: 100dvh;
+  border: 0;
+  background: #000;
+}
+
+.screen-frame:fullscreen canvas {
+  width: min(100vw, 150dvh);
 }

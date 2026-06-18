@@ -209,6 +209,16 @@ canvas.addEventListener("click", (event) => {
 });
 
 document.querySelectorAll(".touch-control").forEach((button) => {
+  if (button.classList.contains("fullscreen")) {
+    button.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      unlockAudio();
+      requestGameFullscreen();
+    });
+    button.addEventListener("contextmenu", (event) => event.preventDefault());
+    return;
+  }
+
   const key = button.dataset.key;
   const press = (event) => {
     event.preventDefault();
@@ -227,6 +237,14 @@ document.querySelectorAll(".touch-control").forEach((button) => {
   button.addEventListener("pointerleave", release);
   button.addEventListener("contextmenu", (event) => event.preventDefault());
 });
+
+function requestGameFullscreen() {
+  const target = document.querySelector(".screen-frame") || document.documentElement;
+  if (document.fullscreenElement) return;
+  if (target.requestFullscreen) {
+    target.requestFullscreen().catch(() => {});
+  }
+}
 
 function normalizeKey(event) {
   if (event.key === " ") return " ";
