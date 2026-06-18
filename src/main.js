@@ -73,6 +73,8 @@ const state = {
   result: null
 };
 
+document.body.dataset.gameMode = state.mode;
+
 const startButton = {
   x: W / 2 - 150,
   y: 506,
@@ -309,6 +311,7 @@ function gameLoop(now) {
 }
 
 function update(dt) {
+  document.body.dataset.gameMode = state.mode;
   state.shake = Math.max(0, state.shake - dt * 18);
   state.flash = Math.max(0, state.flash - dt * 2.5);
 
@@ -325,7 +328,7 @@ function update(dt) {
   if (state.mode === "result") {
     player.celebrate += dt;
     cpu.celebrate += dt;
-    if (pressed.has("Enter")) startMatch(state.playerChoice ?? 0);
+    if (pressed.has("Enter")) returnToMainMenu();
     return;
   }
 
@@ -351,6 +354,16 @@ function updateStart() {
     state.selectedIndex = state.playerChoice ?? 0;
     state.message = "Choose your wrestler";
   }
+}
+
+function returnToMainMenu() {
+  state.mode = "start";
+  state.message = "Hit START to begin";
+  state.pin = null;
+  state.grapple = null;
+  state.result = null;
+  state.shake = 0;
+  state.flash = 0;
 }
 
 function updateSelect() {
@@ -1517,7 +1530,7 @@ function drawResult() {
   ctx.fillText(state.result === "win" ? "Victory by Pinfall" : "Defeat by Pinfall", W / 2, 300);
   ctx.fillStyle = "#f5ead8";
   ctx.font = "22px Arial";
-  ctx.fillText("Press Enter to run it back", W / 2, 350);
+  ctx.fillText("Press Enter / START for main menu", W / 2, 350);
 }
 
 function drawTitle(y) {
