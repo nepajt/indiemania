@@ -29,6 +29,13 @@ const arenas = [
   { id: "vfw", name: "VFW Hall", image: loadImage("assets/arena-vfw.png") }
 ];
 
+const sfx = {
+  punch: makeSoundPool(["assets/sfx-punch-1.wav", "assets/sfx-punch-2.wav", "assets/sfx-punch-3.wav"], 0.48),
+  kick: makeSoundPool(["assets/sfx-kick-1.wav", "assets/sfx-kick-2.wav", "assets/sfx-kick-3.wav"], 0.52),
+  slam: makeSoundPool(["assets/sfx-slam-1.wav", "assets/sfx-slam-2.wav", "assets/sfx-slam-3.wav"], 0.62),
+  finisher: makeSoundPool(["assets/sfx-finisher-slam.wav"], 0.72)
+};
+
 const SPRITE_CELL = { w: 128, h: 150 };
 const JOHNNY_ANIMS = {
   idle: { row: 0, frames: 8, fps: 6 },
@@ -62,6 +69,7 @@ const state = {
   grapple: null,
   cpuThink: 0,
   cpuIntent: "circle",
+  audioUnlocked: false,
   result: null
 };
 
@@ -133,7 +141,34 @@ function loadImage(src) {
   return image;
 }
 
+function makeSoundPool(sources, volume) {
+  return sources.map((src) => {
+    const audio = new Audio(src);
+    audio.preload = "auto";
+    audio.volume = volume;
+    return audio;
+  });
+}
+
+function unlockAudio() {
+  if (state.audioUnlocked) return;
+  state.audioUnlocked = true;
+  Object.values(sfx).flat().forEach((audio) => {
+    audio.load();
+  });
+}
+
+function playSound(name) {
+  if (!state.audioUnlocked || !sfx[name]?.length) return;
+  const pool = sfx[name];
+  const base = pool[Math.floor(Math.random() * pool.length)];
+  const audio = base.cloneNode();
+  audio.volume = base.volume;
+  audio.play().catch(() => {});
+}
+
 window.addEventListener("keydown", (event) => {
+  unlockAudio();
   const key = normalizeKey(event);
   if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " ", "Shift"].includes(key)) {
     event.preventDefault();
@@ -147,6 +182,7 @@ window.addEventListener("keyup", (event) => {
 });
 
 canvas.addEventListener("click", (event) => {
+  unlockAudio();
   if (state.mode !== "start") return;
   const rect = canvas.getBoundingClientRect();
   const x = ((event.clientX - rect.left) / rect.width) * W;
@@ -465,6 +501,7 @@ function tryPunch(attacker, defender) {
   if (inRange(attacker, defender, 58)) {
     const damage = defender.block ? 3 : 8;
     hit(attacker, defender, damage, 14, 0.28, false);
+    playSound("punch");
     state.message = `${attacker.name} lands a punch`;
   } else {
     whiff(attacker, `${attacker.name} misses the punch`);
@@ -481,6 +518,7 @@ function tryKick(attacker, defender) {
     const damage = defender.block ? 4 : 12;
     hit(attacker, defender, damage, 18, 0.36, false);
     defender.vx += attacker.face * 55;
+    playSound("kick");
     state.message = `${attacker.name} lands a kick`;
   } else {
     whiff(attacker, `${attacker.name} misses the kick`);
@@ -541,11 +579,13 @@ function updateGrapple(dt) {
       hit(grapple.attacker, grapple.defender, 18, 24, 0.9, true);
       knockAway(grapple.attacker, grapple.defender, grapple.attacker.isPlayer ? 150 : 112);
       if (!grapple.attacker.isPlayer) grapple.attacker.grappleCooldown = 2.6;
+      playSound("slam");
       state.message = `${grapple.attacker.name} hits a heavy slam`;
     } else {
       hit(grapple.attacker, grapple.defender, 12, 18, 0.55, false);
       grapple.attacker.actionTime = 0.28;
       grapple.defender.actionTime = 0.32;
+      playSound("punch");
       state.message = `${grapple.attacker.name} wins the grapple`;
     }
     state.grapple = null;
@@ -587,6 +627,7 @@ function tryFinisher(attacker, defender) {
     knockAway(attacker, defender, 210);
     state.shake = 1;
     state.flash = 1;
+    playSound("finisher");
     state.message = `${attacker.finisher}!`;
   } else {
     whiff(attacker, `${attacker.name} misses ${attacker.finisher}`);
