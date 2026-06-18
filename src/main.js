@@ -7,6 +7,10 @@ const keys = new Set();
 const pressed = new Set();
 const startImage = new Image();
 startImage.src = "assets/indiemanie-start-screen.png";
+const ringImage = new Image();
+ringImage.src = "assets/indiemania-ring.png";
+const ringFrontImage = new Image();
+ringFrontImage.src = "assets/indiemania-ring-front.png";
 const johnnyAtlas = new Image();
 johnnyAtlas.src = "assets/johnny-toxic-atlas.png?v=transparent-1";
 const joeyAtlas = new Image();
@@ -70,10 +74,24 @@ const startButton = {
 
 const ring = {
   cx: W / 2,
-  cy: 428,
-  w: 540,
-  h: 270,
-  skew: 150
+  cy: 414,
+  w: 519,
+  h: 204,
+  skew: 112
+};
+
+const ringImageBounds = {
+  x: 72,
+  y: 137,
+  w: 816,
+  h: 459
+};
+
+const ringPlayBounds = {
+  back: -176,
+  front: 6,
+  side: 224,
+  taper: 0.34
 };
 
 const roster = [
@@ -158,7 +176,7 @@ function makeWrestler(template, side, isPlayer) {
     isPlayer,
     side,
     x: side === "left" ? -135 : 135,
-    y: side === "left" ? 20 : -20,
+    y: side === "left" ? -18 : -36,
     vx: 0,
     vy: 0,
     face: side === "left" ? 1 : -1,
@@ -419,10 +437,9 @@ function resolveMovement(f, other, dt) {
   f.x += f.vx * dt;
   f.y += f.vy * dt;
 
-  const maxX = ring.w * 0.39 - Math.abs(f.y) * 0.25;
-  const maxY = ring.h * 0.31;
+  const maxX = ringPlayBounds.side - Math.max(0, Math.abs(f.y) - 24) * ringPlayBounds.taper;
   f.x = clamp(f.x, -maxX, maxX);
-  f.y = clamp(f.y, -maxY, maxY);
+  f.y = clamp(f.y, ringPlayBounds.back, ringPlayBounds.front);
   f.face = other.x >= f.x ? 1 : -1;
 }
 
@@ -539,10 +556,11 @@ function positionGrapple(attacker, defender) {
   const side = attacker.x <= defender.x ? 1 : -1;
   const midX = (attacker.x + defender.x) / 2;
   const midY = (attacker.y + defender.y) / 2;
-  attacker.x = clamp(midX - side * 13, -ring.w * 0.36, ring.w * 0.36);
-  defender.x = clamp(midX + side * 13, -ring.w * 0.36, ring.w * 0.36);
-  attacker.y = clamp(midY - 2, -ring.h * 0.28, ring.h * 0.28);
-  defender.y = clamp(midY + 2, -ring.h * 0.28, ring.h * 0.28);
+  const maxX = ringPlayBounds.side - Math.max(0, Math.abs(midY) - 24) * ringPlayBounds.taper;
+  attacker.x = clamp(midX - side * 13, -maxX, maxX);
+  defender.x = clamp(midX + side * 13, -maxX, maxX);
+  attacker.y = clamp(midY - 2, ringPlayBounds.back, ringPlayBounds.front);
+  defender.y = clamp(midY + 2, ringPlayBounds.back, ringPlayBounds.front);
   attacker.face = side;
   defender.face = -side;
   attacker.vx = 0;
@@ -552,9 +570,8 @@ function positionGrapple(attacker, defender) {
 }
 
 function isNearRingEdge(f) {
-  const maxX = ring.w * 0.39 - Math.abs(f.y) * 0.25;
-  const maxY = ring.h * 0.31;
-  return Math.abs(f.x) > maxX - 34 || Math.abs(f.y) > maxY - 26;
+  const maxX = ringPlayBounds.side - Math.max(0, Math.abs(f.y) - 24) * ringPlayBounds.taper;
+  return Math.abs(f.x) > maxX - 34 || f.y < ringPlayBounds.back + 28 || f.y > ringPlayBounds.front - 24;
 }
 
 function tryFinisher(attacker, defender) {
@@ -634,8 +651,9 @@ function updatePin(dt) {
 
 function positionPinAttacker(attacker, defender) {
   const side = attacker.x <= defender.x ? -1 : 1;
-  attacker.x = clamp(defender.x + side * 10, -ring.w * 0.36, ring.w * 0.36);
-  attacker.y = clamp(defender.y - 42, -ring.h * 0.28, ring.h * 0.28);
+  const maxX = ringPlayBounds.side - Math.max(0, Math.abs(defender.y) - 24) * ringPlayBounds.taper;
+  attacker.x = clamp(defender.x + side * 10, -maxX, maxX);
+  attacker.y = clamp(defender.y - 42, ringPlayBounds.back, ringPlayBounds.front);
   attacker.face = side * -1;
   defender.face = side;
 }
@@ -776,8 +794,8 @@ function drawBackground() {
 
 function ringPoint(x, y) {
   return {
-    x: ring.cx + x + y * 0.46,
-    y: ring.cy + y * 0.58
+    x: ring.cx + x + y * 0.34,
+    y: ring.cy + y * 0.76
   };
 }
 
@@ -792,49 +810,86 @@ function ringCorners() {
 
 function ringMat(corners) {
   return corners.map((p) => ({
-    x: ring.cx + (p.x - ring.cx) * 0.88,
-    y: ring.cy + (p.y - ring.cy) * 0.84
+    x: ring.cx + (p.x - ring.cx) * 0.84,
+    y: ring.cy + (p.y - ring.cy) * 0.78
   }));
 }
 
 function drawRingBack() {
-  const outer = ringCorners();
-  const mat = ringMat(outer);
-
-  drawRingShadow(outer);
-  drawRingPlatform(outer);
-  drawMat(mat);
-  drawBackPosts(outer);
-  drawBackRopes(outer);
+  drawRingImage(ringImage);
 }
 
 function drawRingFront() {
-  const outer = ringCorners();
-  drawSideRopeCaps(outer);
-  drawFrontRopes(outer);
-  drawFrontApron(outer);
-  drawFrontPosts(outer);
+  drawRingFrontLayer();
+}
+
+function drawRingImage(image) {
+  if (!image.complete || image.naturalWidth === 0) return;
+  ctx.drawImage(image, ringImageBounds.x, ringImageBounds.y, ringImageBounds.w, ringImageBounds.h);
+}
+
+function drawRingFrontLayer() {
+  if (!ringFrontImage.complete || ringFrontImage.naturalWidth === 0) return;
+  drawRingFrontSlice(0, 0, ringFrontImage.naturalWidth, 720);
+  drawRingFrontSlice(0, 815, ringFrontImage.naturalWidth, ringFrontImage.naturalHeight - 815);
+}
+
+function drawRingFrontSlice(sx, sy, sw, sh) {
+  const scaleX = ringImageBounds.w / ringFrontImage.naturalWidth;
+  const scaleY = ringImageBounds.h / ringFrontImage.naturalHeight;
+  ctx.drawImage(
+    ringFrontImage,
+    sx,
+    sy,
+    sw,
+    sh,
+    ringImageBounds.x + sx * scaleX,
+    ringImageBounds.y + sy * scaleY,
+    sw * scaleX,
+    sh * scaleY
+  );
 }
 
 function drawRingShadow(outer) {
-  ctx.fillStyle = "rgba(0, 0, 0, 0.48)";
+  ctx.save();
+  ctx.shadowColor = "rgba(0, 0, 0, 0.65)";
+  ctx.shadowBlur = 18;
+  ctx.shadowOffsetY = 14;
+  ctx.fillStyle = "rgba(0, 0, 0, 0.38)";
   ctx.beginPath();
-  outer.map((p) => ({ x: p.x + 12, y: p.y + 28 }))
+  outer.map((p) => ({ x: p.x + 10, y: p.y + 24 }))
     .forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
   ctx.closePath();
   ctx.fill();
+  ctx.restore();
 }
 
 function drawRingPlatform(outer) {
-  ctx.fillStyle = "#272a2d";
+  const deck = ctx.createLinearGradient(0, outer[0].y, 0, outer[2].y);
+  deck.addColorStop(0, "#40464d");
+  deck.addColorStop(0.5, "#262b31");
+  deck.addColorStop(1, "#151a20");
+  ctx.fillStyle = deck;
   ctx.beginPath();
   outer.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
   ctx.closePath();
   ctx.fill();
 
-  ctx.fillStyle = "#3a3331";
+  ctx.strokeStyle = "#8b96a2";
+  ctx.lineWidth = 4;
+  ctx.stroke();
+
+  const sideDepth = 24;
+  ctx.fillStyle = "#1d2229";
   ctx.beginPath();
-  [outer[1], outer[2], { x: outer[2].x, y: outer[2].y + 36 }, { x: outer[1].x, y: outer[1].y + 20 }]
+  [outer[0], outer[3], { x: outer[3].x, y: outer[3].y + sideDepth }, { x: outer[0].x, y: outer[0].y + 10 }]
+    .forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = "#202630";
+  ctx.beginPath();
+  [outer[1], outer[2], { x: outer[2].x, y: outer[2].y + sideDepth }, { x: outer[1].x, y: outer[1].y + 10 }]
     .forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
   ctx.closePath();
   ctx.fill();
@@ -842,23 +897,30 @@ function drawRingPlatform(outer) {
 
 function drawMat(mat) {
   const matGradient = ctx.createLinearGradient(0, mat[0].y, 0, mat[2].y);
-  matGradient.addColorStop(0, "#f5f1e4");
-  matGradient.addColorStop(0.58, "#d7d0bf");
-  matGradient.addColorStop(1, "#aaa08d");
+  matGradient.addColorStop(0, "#f4f1e8");
+  matGradient.addColorStop(0.55, "#d8d3c7");
+  matGradient.addColorStop(1, "#b0a797");
   ctx.fillStyle = matGradient;
   ctx.beginPath();
   mat.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
   ctx.closePath();
   ctx.fill();
 
-  ctx.strokeStyle = "rgba(73, 76, 88, 0.45)";
+  ctx.strokeStyle = "#eef1f2";
   ctx.lineWidth = 5;
   ctx.beginPath();
   mat.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
   ctx.closePath();
   ctx.stroke();
 
-  ctx.strokeStyle = "rgba(83, 70, 58, 0.28)";
+  ctx.strokeStyle = "rgba(55, 58, 64, 0.5)";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  mat.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+  ctx.closePath();
+  ctx.stroke();
+
+  ctx.strokeStyle = "rgba(78, 70, 62, 0.18)";
   ctx.lineWidth = 1;
   for (let i = -5; i <= 5; i += 1) {
     const a = lerpPoint(mat[0], mat[3], (i + 5) / 10);
@@ -869,27 +931,27 @@ function drawMat(mat) {
     ctx.stroke();
   }
 
-  ctx.fillStyle = "rgba(40, 43, 50, 0.16)";
-  for (let i = 0; i < 28; i += 1) {
+  ctx.fillStyle = "rgba(52, 55, 61, 0.13)";
+  for (let i = 0; i < 22; i += 1) {
     const t = (i * 37 % 100) / 100;
     const u = (i * 53 % 100) / 100;
     const left = lerpPoint(mat[0], mat[3], u);
     const right = lerpPoint(mat[1], mat[2], u);
     const p = lerpPoint(left, right, t);
-    ctx.fillRect(p.x - 12, p.y - 2, 24 + (i % 3) * 8, 3);
+    ctx.fillRect(p.x - 14, p.y - 2, 28 + (i % 3) * 8, 3);
   }
 }
 
 function drawFrontApron(outer) {
   const topLeft = outer[3];
   const topRight = outer[2];
-  const bottomRight = { x: outer[2].x, y: outer[2].y + 52 };
-  const bottomLeft = { x: outer[3].x, y: outer[3].y + 52 };
+  const bottomRight = { x: outer[2].x, y: outer[2].y + 46 };
+  const bottomLeft = { x: outer[3].x, y: outer[3].y + 46 };
 
   const apron = ctx.createLinearGradient(0, topLeft.y, 0, bottomLeft.y);
-  apron.addColorStop(0, "#181d24");
-  apron.addColorStop(0.5, "#242a37");
-  apron.addColorStop(1, "#0d1016");
+  apron.addColorStop(0, "#27303b");
+  apron.addColorStop(0.45, "#1b222c");
+  apron.addColorStop(1, "#090d13");
   ctx.fillStyle = apron;
   ctx.beginPath();
   [topLeft, topRight, bottomRight, bottomLeft]
@@ -897,20 +959,20 @@ function drawFrontApron(outer) {
   ctx.closePath();
   ctx.fill();
 
-  ctx.strokeStyle = "#556071";
-  ctx.lineWidth = 3;
+  ctx.strokeStyle = "#768292";
+  ctx.lineWidth = 4;
   ctx.beginPath();
-  ctx.moveTo(topLeft.x + 8, topLeft.y + 10);
-  ctx.lineTo(topRight.x - 8, topRight.y + 10);
+  ctx.moveTo(topLeft.x + 10, topLeft.y + 8);
+  ctx.lineTo(topRight.x - 10, topRight.y + 8);
   ctx.stroke();
 
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.18)";
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
   ctx.lineWidth = 2;
-  for (let i = 0; i < 9; i += 1) {
-    const a = lerpPoint(bottomLeft, bottomRight, i / 8);
+  for (let i = 0; i < 8; i += 1) {
+    const a = lerpPoint(bottomLeft, bottomRight, i / 7);
     ctx.beginPath();
-    ctx.moveTo(a.x + 4, a.y - 6);
-    ctx.lineTo(a.x + 34, a.y - 6);
+    ctx.moveTo(a.x + 4, a.y - 7);
+    ctx.lineTo(a.x + 38, a.y - 7);
     ctx.stroke();
   }
 }
@@ -926,28 +988,32 @@ function drawFrontPosts(corners) {
 }
 
 function drawPost(p, cornerIndex, front) {
-  const postW = front ? 20 : 16;
-  const postH = front ? 142 : 124;
+  const postW = front ? 18 : 14;
+  const postH = front ? 132 : 112;
   const top = p.y - postH + 12;
 
-  ctx.fillStyle = front ? "#171b24" : "#252932";
+  const postGradient = ctx.createLinearGradient(p.x - postW / 2, 0, p.x + postW / 2, 0);
+  postGradient.addColorStop(0, "#111722");
+  postGradient.addColorStop(0.42, front ? "#4d5867" : "#343b46");
+  postGradient.addColorStop(1, "#0a0d12");
+  ctx.fillStyle = postGradient;
   ctx.fillRect(p.x - postW / 2, top, postW, postH);
-  ctx.fillStyle = "rgba(255, 255, 255, 0.55)";
-  ctx.fillRect(p.x - postW / 2 + 4, top + 5, 4, postH - 12);
+  ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+  ctx.fillRect(p.x - postW / 2 + 3, top + 5, 3, postH - 12);
   ctx.fillStyle = "rgba(0, 0, 0, 0.45)";
-  ctx.fillRect(p.x + postW / 2 - 5, top + 6, 4, postH - 12);
-  ctx.fillStyle = "#dfe8ef";
-  ctx.fillRect(p.x - postW / 2 - 3, top - 5, postW + 6, 8);
+  ctx.fillRect(p.x + postW / 2 - 4, top + 6, 3, postH - 12);
+  ctx.fillStyle = "#dbe4eb";
+  ctx.fillRect(p.x - postW / 2 - 4, top - 5, postW + 8, 8);
 
   const colors = cornerIndex === 1 || cornerIndex === 3
     ? ["#e51f2f", "#e6edf5", "#1f63d8"]
     : ["#1f63d8", "#e6edf5", "#222936"];
-  [94, 66, 38].forEach((lift, i) => drawTurnbuckle(p.x, p.y - lift, colors[i], front));
+  [88, 62, 38].forEach((lift, i) => drawTurnbuckle(p.x, p.y - lift, colors[i], front));
 }
 
 function drawTurnbuckle(x, y, color, front) {
-  const w = front ? 42 : 36;
-  const h = front ? 22 : 18;
+  const w = front ? 36 : 30;
+  const h = front ? 20 : 16;
   ctx.fillStyle = "rgba(0, 0, 0, 0.45)";
   ctx.fillRect(x - w / 2 + 4, y - h / 2 + 4, w, h);
   ctx.fillStyle = color;
@@ -960,7 +1026,7 @@ function drawTurnbuckle(x, y, color, front) {
 
 function drawBackRopes(corners) {
   for (let i = 0; i < 3; i += 1) {
-    const lift = 94 - i * 28;
+    const lift = 88 - i * 25;
     drawRopeSegment(corners[0], corners[1], lift, ropeColor(i), 4);
     drawRopeSegment(corners[0], corners[3], lift, ropeColor(i), 3);
     drawRopeSegment(corners[1], corners[2], lift, ropeColor(i), 3);
@@ -969,28 +1035,28 @@ function drawBackRopes(corners) {
 
 function drawFrontRopes(corners) {
   for (let i = 0; i < 3; i += 1) {
-    const lift = 94 - i * 28;
-    drawRopeSegment(corners[3], corners[2], lift, ropeColor(i), 7);
+    const lift = 88 - i * 25;
+    drawRopeSegment(corners[3], corners[2], lift, ropeColor(i), 6);
   }
 }
 
 function drawSideRopeCaps(corners) {
   for (let i = 0; i < 3; i += 1) {
-    const lift = 94 - i * 28;
-    const leftMid = lerpPoint(corners[0], corners[3], 0.62);
-    const rightMid = lerpPoint(corners[1], corners[2], 0.62);
-    drawRopeSegment(leftMid, corners[3], lift, ropeColor(i), 6);
-    drawRopeSegment(rightMid, corners[2], lift, ropeColor(i), 6);
+    const lift = 88 - i * 25;
+    const leftMid = lerpPoint(corners[0], corners[3], 0.55);
+    const rightMid = lerpPoint(corners[1], corners[2], 0.55);
+    drawRopeSegment(leftMid, corners[3], lift, ropeColor(i), 5);
+    drawRopeSegment(rightMid, corners[2], lift, ropeColor(i), 5);
   }
 }
 
 function drawRopeSegment(a, b, lift, color, width) {
   ctx.lineCap = "round";
-  ctx.strokeStyle = "rgba(0, 0, 0, 0.55)";
-  ctx.lineWidth = width + 4;
+  ctx.strokeStyle = "rgba(0, 0, 0, 0.58)";
+  ctx.lineWidth = width + 3;
   ctx.beginPath();
-  ctx.moveTo(a.x, a.y - lift + 4);
-  ctx.lineTo(b.x, b.y - lift + 4);
+  ctx.moveTo(a.x, a.y - lift + 3);
+  ctx.lineTo(b.x, b.y - lift + 3);
   ctx.stroke();
 
   ctx.strokeStyle = color;
@@ -1000,17 +1066,17 @@ function drawRopeSegment(a, b, lift, color, width) {
   ctx.lineTo(b.x, b.y - lift);
   ctx.stroke();
 
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.48)";
   ctx.lineWidth = Math.max(1, width * 0.22);
   ctx.beginPath();
-  ctx.moveTo(a.x + 2, a.y - lift - width * 0.22);
-  ctx.lineTo(b.x - 2, b.y - lift - width * 0.22);
+  ctx.moveTo(a.x + 3, a.y - lift - width * 0.24);
+  ctx.lineTo(b.x - 3, b.y - lift - width * 0.24);
   ctx.stroke();
   ctx.lineCap = "butt";
 }
 
 function ropeColor(index) {
-  return index === 0 ? "#f22a36" : index === 1 ? "#edf2fa" : "#1765e8";
+  return index === 0 ? "#f03342" : index === 1 ? "#eef3f8" : "#1f6ee8";
 }
 
 function drawRing() {
@@ -1192,7 +1258,8 @@ function drawSelectPortraitImage(image, r, x, y, selected) {
 
 function drawWrestler(f) {
   const p = ringPoint(f.x, f.y);
-  const scale = 0.92 + ((f.y + ring.h / 2) / ring.h) * 0.28;
+  const depth = (f.y - ringPlayBounds.back) / (ringPlayBounds.front - ringPlayBounds.back);
+  const scale = 0.88 + depth * 0.22;
   const atlas = getSpriteAtlas(f);
   if (atlas) {
     drawSpriteWrestler(f, p, scale, atlas);
