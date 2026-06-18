@@ -5,8 +5,6 @@ const W = canvas.width;
 const H = canvas.height;
 const keys = new Set();
 const pressed = new Set();
-const arenaImage = new Image();
-arenaImage.src = "assets/arena.png";
 const startImage = new Image();
 startImage.src = "assets/indiemanie-start-screen.png";
 const johnnyAtlas = new Image();
@@ -20,6 +18,12 @@ const selectPortraits = {
   image: loadImage("assets/joey-image-select.png"),
   phil: loadImage("assets/phil-stamper-select.png")
 };
+
+const arenas = [
+  { id: "gym", name: "Brick Hall", image: loadImage("assets/arena.png") },
+  { id: "outdoors", name: "Outdoor Show", image: loadImage("assets/arena-outdoors.png") },
+  { id: "vfw", name: "VFW Hall", image: loadImage("assets/arena-vfw.png") }
+];
 
 const SPRITE_CELL = { w: 128, h: 150 };
 const JOHNNY_ANIMS = {
@@ -42,6 +46,7 @@ const JOHNNY_ANIMS = {
 const state = {
   mode: "start",
   selectedIndex: 0,
+  arenaIndex: 0,
   playerChoice: null,
   cpuChoice: null,
   selectStep: "player",
@@ -262,15 +267,26 @@ function updateSelect() {
       state.selectedIndex = state.cpuChoice;
       state.selectStep = "cpu";
       state.message = "Choose your opponent";
-    } else {
+    } else if (state.selectStep === "cpu") {
       state.cpuChoice = state.selectedIndex;
+      state.selectedIndex = state.arenaIndex;
+      state.selectStep = "arena";
+      state.message = "Choose your arena";
+    } else {
+      state.arenaIndex = state.selectedIndex;
       startMatch(state.playerChoice ?? 0);
     }
   }
-  if (pressed.has("Escape") && state.selectStep === "cpu") {
-    state.selectStep = "player";
-    state.selectedIndex = state.playerChoice ?? 0;
-    state.message = "Choose your wrestler";
+  if (pressed.has("Escape")) {
+    if (state.selectStep === "arena") {
+      state.selectStep = "cpu";
+      state.selectedIndex = state.cpuChoice ?? nextOpponentIndex(state.playerChoice ?? 0);
+      state.message = "Choose your opponent";
+    } else if (state.selectStep === "cpu") {
+      state.selectStep = "player";
+      state.selectedIndex = state.playerChoice ?? 0;
+      state.message = "Choose your wrestler";
+    }
   }
 }
 
@@ -279,8 +295,9 @@ function nextOpponentIndex(playerIndex) {
 }
 
 function moveSelectCursor(direction) {
+  const listLength = state.selectStep === "arena" ? arenas.length : roster.length;
   do {
-    state.selectedIndex = (state.selectedIndex + direction + roster.length) % roster.length;
+    state.selectedIndex = (state.selectedIndex + direction + listLength) % listLength;
   } while (state.selectStep === "cpu" && state.selectedIndex === state.playerChoice);
 }
 
@@ -724,6 +741,8 @@ function draw() {
 }
 
 function drawBackground() {
+  const arena = arenas[state.arenaIndex] ?? arenas[0];
+  const arenaImage = arena.image;
   if (arenaImage.complete && arenaImage.naturalWidth > 0) {
     const scale = Math.max(W / arenaImage.naturalWidth, H / arenaImage.naturalHeight);
     const dw = arenaImage.naturalWidth * scale;
@@ -1034,10 +1053,18 @@ function drawStart() {
 
 function drawSelect() {
   const choosingCpu = state.selectStep === "cpu";
+  const choosingArena = state.selectStep === "arena";
   ctx.textAlign = "center";
   ctx.fillStyle = "#f5ead8";
   ctx.font = "30px Impact";
-  ctx.fillText(choosingCpu ? "Choose Your Opponent" : "Choose Your Wrestler", W / 2, 116);
+  ctx.fillText(choosingArena ? "Choose Your Arena" : choosingCpu ? "Choose Your Opponent" : "Choose Your Wrestler", W / 2, 116);
+  if (choosingArena) {
+    ctx.fillStyle = "#f4c44f";
+    ctx.font = "18px Arial";
+    ctx.fillText(`${roster[state.playerChoice].name} vs ${roster[state.cpuChoice].name}`, W / 2, 144);
+    drawArenaSelect();
+    return;
+  }
   if (choosingCpu && state.playerChoice !== null) {
     ctx.fillStyle = "#f4c44f";
     ctx.font = "18px Arial";
@@ -1071,7 +1098,46 @@ function drawSelect() {
 
   ctx.fillStyle = "#f4c44f";
   ctx.font = "18px Arial";
-  ctx.fillText(choosingCpu ? "Arrow keys choose opponent. Enter starts. Esc backs up." : "Arrow keys choose player. Enter confirms.", W / 2, 562);
+  ctx.fillText(choosingCpu ? "Arrow keys choose opponent. Enter confirms. Esc backs up." : "Arrow keys choose player. Enter confirms.", W / 2, 562);
+}
+
+function drawArenaSelect() {
+  arenas.forEach((arena, i) => {
+    const gap = 280;
+    const x = W / 2 - ((arenas.length - 1) * gap) / 2 + i * gap;
+    const y = 344;
+    const selected = state.selectedIndex === i;
+    ctx.fillStyle = selected ? "#f4c44f" : "#2a2e32";
+    ctx.fillRect(x - 138, y - 104, 276, 208);
+    ctx.fillStyle = "#101317";
+    ctx.fillRect(x - 128, y - 94, 256, 164);
+    drawArenaPreview(arena, x - 128, y - 94, 256, 164);
+    ctx.fillStyle = "#f5ead8";
+    ctx.font = "24px Impact";
+    ctx.fillText(arena.name, x, y + 104);
+  });
+
+  ctx.fillStyle = "#f4c44f";
+  ctx.font = "18px Arial";
+  ctx.fillText("Arrow keys choose arena. Enter starts. Esc backs up.", W / 2, 562);
+}
+
+function drawArenaPreview(arena, x, y, w, h) {
+  const image = arena.image;
+  if (image.complete && image.naturalWidth > 0) {
+    const scale = Math.max(w / image.naturalWidth, h / image.naturalHeight);
+    const sw = w / scale;
+    const sh = h / scale;
+    const sx = (image.naturalWidth - sw) / 2;
+    const sy = (image.naturalHeight - sh) / 2;
+    ctx.drawImage(image, sx, sy, sw, sh, x, y, w, h);
+  } else {
+    ctx.fillStyle = "#1a1d22";
+    ctx.fillRect(x, y, w, h);
+  }
+  ctx.strokeStyle = "rgba(245, 234, 216, 0.8)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x, y, w, h);
 }
 
 function drawPortrait(r, x, y, selected) {
