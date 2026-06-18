@@ -167,18 +167,26 @@ function playSound(name) {
   audio.play().catch(() => {});
 }
 
-window.addEventListener("keydown", (event) => {
+function pressGameKey(key) {
   unlockAudio();
+  if (!keys.has(key)) pressed.add(key);
+  keys.add(key);
+}
+
+function releaseGameKey(key) {
+  keys.delete(key);
+}
+
+window.addEventListener("keydown", (event) => {
   const key = normalizeKey(event);
   if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " ", "Shift"].includes(key)) {
     event.preventDefault();
   }
-  if (!keys.has(key)) pressed.add(key);
-  keys.add(key);
+  pressGameKey(key);
 });
 
 window.addEventListener("keyup", (event) => {
-  keys.delete(normalizeKey(event));
+  releaseGameKey(normalizeKey(event));
 });
 
 canvas.addEventListener("click", (event) => {
@@ -198,6 +206,26 @@ canvas.addEventListener("click", (event) => {
     state.selectedIndex = state.playerChoice ?? 0;
     state.message = "Choose your wrestler";
   }
+});
+
+document.querySelectorAll(".touch-control").forEach((button) => {
+  const key = button.dataset.key;
+  const press = (event) => {
+    event.preventDefault();
+    button.classList.add("is-down");
+    pressGameKey(key);
+  };
+  const release = (event) => {
+    event.preventDefault();
+    button.classList.remove("is-down");
+    releaseGameKey(key);
+  };
+
+  button.addEventListener("pointerdown", press);
+  button.addEventListener("pointerup", release);
+  button.addEventListener("pointercancel", release);
+  button.addEventListener("pointerleave", release);
+  button.addEventListener("contextmenu", (event) => event.preventDefault());
 });
 
 function normalizeKey(event) {

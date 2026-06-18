@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>INDIEMANIA</title>
+    <title>Rumble64</title>
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
@@ -11,6 +11,25 @@
       <section class="cabinet">
         <div class="screen-frame">
           <canvas id="game" width="960" height="640" aria-label="Rumble64 playable wrestling match"></canvas>
+          <div class="mobile-controls" aria-label="Touch controls">
+            <div class="mobile-pad" aria-label="Movement pad">
+              <button class="touch-control pad up" data-key="ArrowUp" aria-label="Move up">U</button>
+              <button class="touch-control pad left" data-key="ArrowLeft" aria-label="Move left">L</button>
+              <button class="touch-control pad right" data-key="ArrowRight" aria-label="Move right">R</button>
+              <button class="touch-control pad down" data-key="ArrowDown" aria-label="Move down">D</button>
+            </div>
+            <div class="mobile-actions" aria-label="Action buttons">
+              <button class="touch-control action primary" data-key="z">P</button>
+              <button class="touch-control action primary" data-key="v">K</button>
+              <button class="touch-control action" data-key="x">G</button>
+              <button class="touch-control action" data-key="s">F</button>
+              <button class="touch-control action small" data-key="a">PIN</button>
+              <button class="touch-control action small" data-key="c">RUN</button>
+              <button class="touch-control action small" data-key="Shift">BLK</button>
+              <button class="touch-control action small" data-key=" ">OUT</button>
+              <button class="touch-control start" data-key="Enter">START</button>
+            </div>
+          </div>
         </div>
         <div class="controls">
           <span>Move: Arrow Keys</span>
@@ -24,6 +43,6 @@
         </div>
       </section>
     </main>
-    <script src="src/main.js?v=hit-sfx-1"></script>
+    <script src="src/main.js?v=mobile-controls-1"></script>
   </body>
 </html>
