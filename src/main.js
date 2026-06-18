@@ -13,9 +13,12 @@ const johnnyAtlas = new Image();
 johnnyAtlas.src = "assets/johnny-toxic-atlas.png?v=blue-key-3";
 const joeyAtlas = new Image();
 joeyAtlas.src = "assets/joey-image-atlas.png?v=full-template-1";
+const philAtlas = new Image();
+philAtlas.src = "assets/phil-stamper-atlas.png?v=phil-1";
 const selectPortraits = {
   toxic: loadImage("assets/johnny-toxic-select.png"),
-  image: loadImage("assets/joey-image-select.png")
+  image: loadImage("assets/joey-image-select.png"),
+  phil: loadImage("assets/phil-stamper-select.png")
 };
 
 const SPRITE_CELL = { w: 128, h: 150 };
@@ -83,6 +86,15 @@ const roster = [
     secondary: "#273c86",
     accent: "#f6f0ef",
     sprite: "joey"
+  },
+  {
+    id: "phil",
+    name: "Phil Stamper",
+    finisher: "The Brainbuster",
+    primary: "#8f3043",
+    secondary: "#1a1c22",
+    accent: "#d5d8df",
+    sprite: "phil"
   }
 ];
 
@@ -161,7 +173,7 @@ function makeWrestler(template, side, isPlayer) {
 
 function startMatch(choiceIndex) {
   const playerTemplate = roster[choiceIndex];
-  const cpuTemplate = roster[choiceIndex === 0 ? 1 : 0];
+  const cpuTemplate = roster[(choiceIndex + 1) % roster.length];
   player = makeWrestler(playerTemplate, "left", true);
   cpu = makeWrestler(cpuTemplate, "right", false);
   state.mode = "fight";
@@ -224,8 +236,11 @@ function updateStart() {
 }
 
 function updateSelect() {
-  if (pressed.has("ArrowLeft") || pressed.has("ArrowRight")) {
-    state.selectedIndex = state.selectedIndex === 0 ? 1 : 0;
+  if (pressed.has("ArrowLeft")) {
+    state.selectedIndex = (state.selectedIndex + roster.length - 1) % roster.length;
+  }
+  if (pressed.has("ArrowRight")) {
+    state.selectedIndex = (state.selectedIndex + 1) % roster.length;
   }
   if (pressed.has("Enter") || pressed.has("z") || pressed.has("x")) {
     startMatch(state.selectedIndex);
@@ -920,7 +935,8 @@ function drawSelect() {
   ctx.fillText("Choose Your Wrestler", W / 2, 116);
 
   roster.forEach((r, i) => {
-    const x = i === 0 ? W / 2 - 190 : W / 2 + 190;
+    const gap = 250;
+    const x = W / 2 - ((roster.length - 1) * gap) / 2 + i * gap;
     const y = 352;
     ctx.fillStyle = state.selectedIndex === i ? "#f4c44f" : "#2a2e32";
     ctx.fillRect(x - 130, y - 124, 260, 248);
@@ -1000,7 +1016,7 @@ function drawWrestler(f) {
 }
 
 function getSpriteAtlas(f) {
-  const atlas = f.sprite === "johnny" ? johnnyAtlas : f.sprite === "joey" ? joeyAtlas : null;
+  const atlas = f.sprite === "johnny" ? johnnyAtlas : f.sprite === "joey" ? joeyAtlas : f.sprite === "phil" ? philAtlas : null;
   return atlas && atlas.complete && atlas.naturalWidth > 0 ? atlas : null;
 }
 
