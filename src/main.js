@@ -10,7 +10,7 @@ arenaImage.src = "assets/arena.png";
 const startImage = new Image();
 startImage.src = "assets/indiemanie-start-screen.png";
 const johnnyAtlas = new Image();
-johnnyAtlas.src = "assets/johnny-toxic-atlas.png?v=blue-key-3";
+johnnyAtlas.src = "assets/johnny-toxic-atlas.png?v=transparent-1";
 const joeyAtlas = new Image();
 joeyAtlas.src = "assets/joey-image-atlas.png?v=full-template-1";
 const philAtlas = new Image();
@@ -43,11 +43,14 @@ const state = {
   mode: "start",
   selectedIndex: 0,
   playerChoice: null,
+  cpuChoice: null,
+  selectStep: "player",
   message: "Hit START to begin",
   shake: 0,
   flash: 0,
   lastTime: performance.now(),
   pin: null,
+  grapple: null,
   cpuThink: 0,
   cpuIntent: "circle",
   result: null
@@ -132,6 +135,8 @@ canvas.addEventListener("click", (event) => {
     y <= startButton.y + startButton.h
   ) {
     state.mode = "select";
+    state.selectStep = "player";
+    state.selectedIndex = state.playerChoice ?? 0;
     state.message = "Choose your wrestler";
   }
 });
@@ -166,18 +171,22 @@ function makeWrestler(template, side, isPlayer) {
     block: false,
     kickMash: 0,
     pinCooldown: 0,
+    grappleCooldown: 0,
     aiCooldown: 0,
     celebrate: 0
   };
 }
 
 function startMatch(choiceIndex) {
-  const playerTemplate = roster[choiceIndex];
-  const cpuTemplate = roster[(choiceIndex + 1) % roster.length];
+  const playerIndex = choiceIndex;
+  const cpuIndex = state.cpuChoice ?? nextOpponentIndex(playerIndex);
+  const playerTemplate = roster[playerIndex];
+  const cpuTemplate = roster[cpuIndex];
   player = makeWrestler(playerTemplate, "left", true);
   cpu = makeWrestler(cpuTemplate, "right", false);
   state.mode = "fight";
-  state.playerChoice = choiceIndex;
+  state.playerChoice = playerIndex;
+  state.cpuChoice = cpuIndex;
   state.message = `${player.name} vs ${cpu.name}`;
   state.pin = null;
   state.result = null;
@@ -217,6 +226,8 @@ function update(dt) {
 
   if (state.pin) {
     updatePin(dt);
+  } else if (state.grapple) {
+    updateGrapple(dt);
   } else {
     updateFighterTimers(player, dt);
     updateFighterTimers(cpu, dt);
@@ -231,26 +242,53 @@ function update(dt) {
 function updateStart() {
   if (pressed.has("Enter")) {
     state.mode = "select";
+    state.selectStep = "player";
+    state.selectedIndex = state.playerChoice ?? 0;
     state.message = "Choose your wrestler";
   }
 }
 
 function updateSelect() {
   if (pressed.has("ArrowLeft")) {
-    state.selectedIndex = (state.selectedIndex + roster.length - 1) % roster.length;
+    moveSelectCursor(-1);
   }
   if (pressed.has("ArrowRight")) {
-    state.selectedIndex = (state.selectedIndex + 1) % roster.length;
+    moveSelectCursor(1);
   }
   if (pressed.has("Enter") || pressed.has("z") || pressed.has("x")) {
-    startMatch(state.selectedIndex);
+    if (state.selectStep === "player") {
+      state.playerChoice = state.selectedIndex;
+      state.cpuChoice = nextOpponentIndex(state.playerChoice);
+      state.selectedIndex = state.cpuChoice;
+      state.selectStep = "cpu";
+      state.message = "Choose your opponent";
+    } else {
+      state.cpuChoice = state.selectedIndex;
+      startMatch(state.playerChoice ?? 0);
+    }
   }
+  if (pressed.has("Escape") && state.selectStep === "cpu") {
+    state.selectStep = "player";
+    state.selectedIndex = state.playerChoice ?? 0;
+    state.message = "Choose your wrestler";
+  }
+}
+
+function nextOpponentIndex(playerIndex) {
+  return (playerIndex + 1) % roster.length;
+}
+
+function moveSelectCursor(direction) {
+  do {
+    state.selectedIndex = (state.selectedIndex + direction + roster.length) % roster.length;
+  } while (state.selectStep === "cpu" && state.selectedIndex === state.playerChoice);
 }
 
 function updateFighterTimers(f, dt) {
   f.actionTime = Math.max(0, f.actionTime - dt);
   f.stun = Math.max(0, f.stun - dt);
   f.pinCooldown = Math.max(0, f.pinCooldown - dt);
+  f.grappleCooldown = Math.max(0, f.grappleCooldown - dt);
   f.aiCooldown = Math.max(0, f.aiCooldown - dt);
   f.block = false;
 
@@ -304,12 +342,14 @@ function updateCpu(dt) {
 
   state.cpuThink -= dt;
   const d = distance(cpu, player);
+  const playerCrowded = isNearRingEdge(player) && d < 76;
   if (state.cpuThink <= 0) {
-    state.cpuThink = 0.25 + Math.random() * 0.45;
+    state.cpuThink = 0.34 + Math.random() * 0.52;
     if (player.down > 0 && d < 85 && cpu.pinCooldown === 0) state.cpuIntent = "pin";
     else if (cpu.momentum >= 100 && d < 70) state.cpuIntent = "finisher";
-    else if (d < 55 && Math.random() < 0.38) state.cpuIntent = "grapple";
-    else if (d < 82 && Math.random() < 0.22) state.cpuIntent = "kick";
+    else if (playerCrowded && Math.random() < 0.72) state.cpuIntent = "retreat";
+    else if (d < 56 && cpu.grappleCooldown === 0 && Math.random() < 0.16) state.cpuIntent = "grapple";
+    else if (d < 82 && Math.random() < 0.26) state.cpuIntent = "kick";
     else if (d < 72 && Math.random() < 0.58) state.cpuIntent = "punch";
     else state.cpuIntent = cpu.stamina < 30 && player.stamina > cpu.stamina ? "retreat" : "approach";
   }
@@ -414,26 +454,90 @@ function tryKick(attacker, defender) {
 }
 
 function tryGrapple(attacker, defender) {
-  if (!canAct(attacker)) return;
+  if (!canAct(attacker) || attacker.grappleCooldown > 0) return;
   attacker.state = "grapple";
-  attacker.actionTime = 0.48;
+  attacker.actionTime = 0.82;
   attacker.actionDuration = attacker.actionTime;
   attacker.action = "grapple";
-  if (inRange(attacker, defender, 52)) {
-    if (defender.stun > 0 || defender.stamina < 42) {
-      attacker.state = "slam";
-      attacker.actionTime = 0.72;
-      attacker.actionDuration = attacker.actionTime;
-      hit(attacker, defender, 18, 24, 0.9, true);
-      knockAway(attacker, defender, 150);
-      state.message = `${attacker.name} hits a heavy slam`;
-    } else {
-      hit(attacker, defender, 12, 18, 0.55, false);
-      state.message = `${attacker.name} wins the grapple`;
-    }
+  attacker.grappleCooldown = attacker.isPlayer ? 0.45 : 1.65;
+  if (inRange(attacker, defender, 78)) {
+    const slamReady = attacker.isPlayer
+      ? defender.stun > 0 || defender.stamina < 42
+      : (defender.stun > 0 && attacker.momentum >= 28) || defender.stamina < 30;
+    defender.state = "grapple";
+    defender.action = "grappled";
+    defender.actionTime = 0.82;
+    defender.actionDuration = defender.actionTime;
+    defender.stun = Math.max(defender.stun, 0.5);
+    attacker.vx = 0;
+    attacker.vy = 0;
+    defender.vx = 0;
+    defender.vy = 0;
+    state.grapple = {
+      attacker,
+      defender,
+      timer: 0,
+      resolveAt: 0.56,
+      slam: slamReady,
+      resolved: false
+    };
+    positionGrapple(attacker, defender);
+    state.message = `${attacker.name} locks up`;
   } else {
     whiff(attacker, `${attacker.name} grabs air`);
   }
+}
+
+function updateGrapple(dt) {
+  const grapple = state.grapple;
+  grapple.timer += dt;
+  positionGrapple(grapple.attacker, grapple.defender);
+  grapple.attacker.actionTime = Math.max(0, grapple.attacker.actionDuration - grapple.timer);
+  grapple.defender.actionTime = Math.max(0, grapple.defender.actionDuration - grapple.timer);
+  grapple.attacker.state = grapple.resolved ? grapple.attacker.state : "grapple";
+  grapple.defender.state = grapple.resolved ? grapple.defender.state : "grapple";
+
+  if (!grapple.resolved && grapple.timer >= grapple.resolveAt) {
+    grapple.resolved = true;
+    if (grapple.slam) {
+      grapple.attacker.state = "slam";
+      grapple.attacker.action = "slam";
+      grapple.attacker.actionTime = 0.72;
+      grapple.attacker.actionDuration = grapple.attacker.actionTime;
+      hit(grapple.attacker, grapple.defender, 18, 24, 0.9, true);
+      knockAway(grapple.attacker, grapple.defender, grapple.attacker.isPlayer ? 150 : 112);
+      if (!grapple.attacker.isPlayer) grapple.attacker.grappleCooldown = 2.6;
+      state.message = `${grapple.attacker.name} hits a heavy slam`;
+    } else {
+      hit(grapple.attacker, grapple.defender, 12, 18, 0.55, false);
+      grapple.attacker.actionTime = 0.28;
+      grapple.defender.actionTime = 0.32;
+      state.message = `${grapple.attacker.name} wins the grapple`;
+    }
+    state.grapple = null;
+  }
+}
+
+function positionGrapple(attacker, defender) {
+  const side = attacker.x <= defender.x ? 1 : -1;
+  const midX = (attacker.x + defender.x) / 2;
+  const midY = (attacker.y + defender.y) / 2;
+  attacker.x = clamp(midX - side * 13, -ring.w * 0.36, ring.w * 0.36);
+  defender.x = clamp(midX + side * 13, -ring.w * 0.36, ring.w * 0.36);
+  attacker.y = clamp(midY - 2, -ring.h * 0.28, ring.h * 0.28);
+  defender.y = clamp(midY + 2, -ring.h * 0.28, ring.h * 0.28);
+  attacker.face = side;
+  defender.face = -side;
+  attacker.vx = 0;
+  attacker.vy = 0;
+  defender.vx = 0;
+  defender.vy = 0;
+}
+
+function isNearRingEdge(f) {
+  const maxX = ring.w * 0.39 - Math.abs(f.y) * 0.25;
+  const maxY = ring.h * 0.31;
+  return Math.abs(f.x) > maxX - 34 || Math.abs(f.y) > maxY - 26;
 }
 
 function tryFinisher(attacker, defender) {
@@ -557,7 +661,7 @@ function hit(attacker, defender, staminaDamage, momentumGain, stunTime, knockdow
 }
 
 function whiff(attacker, message) {
-  if (!["punch", "kick"].includes(attacker.state)) {
+  if (!["punch", "kick", "grapple"].includes(attacker.state)) {
     attacker.state = "whiff";
   }
   attacker.actionTime += 0.24;
@@ -929,28 +1033,45 @@ function drawStart() {
 }
 
 function drawSelect() {
+  const choosingCpu = state.selectStep === "cpu";
   ctx.textAlign = "center";
   ctx.fillStyle = "#f5ead8";
   ctx.font = "30px Impact";
-  ctx.fillText("Choose Your Wrestler", W / 2, 116);
+  ctx.fillText(choosingCpu ? "Choose Your Opponent" : "Choose Your Wrestler", W / 2, 116);
+  if (choosingCpu && state.playerChoice !== null) {
+    ctx.fillStyle = "#f4c44f";
+    ctx.font = "18px Arial";
+    ctx.fillText(`Player: ${roster[state.playerChoice].name}`, W / 2, 144);
+  }
 
   roster.forEach((r, i) => {
     const gap = 250;
     const x = W / 2 - ((roster.length - 1) * gap) / 2 + i * gap;
     const y = 352;
-    ctx.fillStyle = state.selectedIndex === i ? "#f4c44f" : "#2a2e32";
+    const isSelected = state.selectedIndex === i;
+    const isPlayerChoice = choosingCpu && state.playerChoice === i;
+    ctx.fillStyle = isSelected ? "#f4c44f" : isPlayerChoice ? "#46b85a" : "#2a2e32";
     ctx.fillRect(x - 130, y - 124, 260, 248);
     ctx.fillStyle = "#111";
     ctx.fillRect(x - 118, y - 112, 236, 224);
-    drawPortrait(r, x, y - 6, state.selectedIndex === i);
+    drawPortrait(r, x, y - 6, isSelected || isPlayerChoice);
     ctx.fillStyle = "#f5ead8";
     ctx.font = "25px Impact";
     ctx.fillText(r.name, x, y + 92);
+    if (isPlayerChoice) {
+      ctx.fillStyle = "#46b85a";
+      ctx.font = "16px Impact";
+      ctx.fillText("PLAYER", x, y + 116);
+    } else if (choosingCpu && isSelected) {
+      ctx.fillStyle = "#e74846";
+      ctx.font = "16px Impact";
+      ctx.fillText("CPU", x, y + 116);
+    }
   });
 
   ctx.fillStyle = "#f4c44f";
   ctx.font = "18px Arial";
-  ctx.fillText("Arrow keys choose. Enter starts.", W / 2, 562);
+  ctx.fillText(choosingCpu ? "Arrow keys choose opponent. Enter starts. Esc backs up." : "Arrow keys choose player. Enter confirms.", W / 2, 562);
 }
 
 function drawPortrait(r, x, y, selected) {
@@ -1121,9 +1242,9 @@ function drawBlockWrestler(f, p, scale) {
 }
 
 function drawHud() {
-  drawBar(34, 28, 330, 18, player.stamina / 100, player.primary, player.name);
+  drawBar(34, 28, 330, 18, player.stamina / 100, healthColor(player.stamina / 100), player.name);
   drawBar(34, 54, 330, 12, player.momentum / 100, "#f4c44f", "");
-  drawBar(W - 364, 28, 330, 18, cpu.stamina / 100, cpu.primary, cpu.name);
+  drawBar(W - 364, 28, 330, 18, cpu.stamina / 100, healthColor(cpu.stamina / 100), cpu.name);
   drawBar(W - 364, 54, 330, 12, cpu.momentum / 100, "#f4c44f", "");
 
   if (state.pin) {
@@ -1137,6 +1258,12 @@ function drawHud() {
       ctx.fillText("Tap Space to kick out", W / 2, 145);
     }
   }
+}
+
+function healthColor(pct) {
+  if (pct <= 0.2) return "#d62f2f";
+  if (pct < 0.6) return "#f4c44f";
+  return "#46b85a";
 }
 
 function drawBar(x, y, w, h, pct, fill, label) {
