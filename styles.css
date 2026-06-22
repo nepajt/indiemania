@@ -130,6 +130,34 @@ canvas {
   bottom: 0;
 }
 
+.pad::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  border-top: 3px solid currentColor;
+  border-left: 3px solid currentColor;
+  transform-origin: center;
+}
+
+.pad.up::before {
+  transform: translate(-50%, -35%) rotate(45deg);
+}
+
+.pad.left::before {
+  transform: translate(-35%, -50%) rotate(-45deg);
+}
+
+.pad.right::before {
+  transform: translate(-65%, -50%) rotate(135deg);
+}
+
+.pad.down::before {
+  transform: translate(-50%, -65%) rotate(225deg);
+}
+
 .mobile-actions {
   right: 16px;
   bottom: 16px;
@@ -183,14 +211,17 @@ body[data-game-mode="result"] .mobile-pad {
 }
 
 .start {
-  grid-column: 1 / 4;
+  grid-column: 3;
+  grid-row: 3;
   border-radius: 8px;
   color: #221916;
   background: rgba(244, 196, 79, 0.9);
+  font-size: 13px;
 }
 
 .fullscreen {
   grid-column: 3;
+  grid-row: 2;
   border-radius: 8px;
   font-size: 14px;
 }
@@ -349,6 +380,8 @@ body[data-game-mode="fight"] .fullscreen {
     --shell-gap: 0px;
     --height-gap: 0px;
     --game-w: min(100vw, 150dvh);
+    --touch-cell: clamp(25px, 8dvh, 32px);
+    --touch-gap: clamp(3px, 1.1dvh, 5px);
   }
 
   body {
@@ -371,40 +404,41 @@ body[data-game-mode="fight"] .fullscreen {
   }
 
   .mobile-pad {
-    left: max(8px, env(safe-area-inset-left));
-    bottom: max(8px, env(safe-area-inset-bottom));
-    width: 96px;
-    height: 96px;
+    left: max(5px, env(safe-area-inset-left));
+    bottom: max(5px, env(safe-area-inset-bottom));
+    width: calc(var(--touch-cell) * 3);
+    height: calc(var(--touch-cell) * 3);
   }
 
   .pad {
-    width: 32px;
-    height: 32px;
+    width: var(--touch-cell);
+    height: var(--touch-cell);
     border-radius: 6px;
-    font-size: 14px;
+    font-size: clamp(11px, 3.2dvh, 13px);
     border-width: 1px;
   }
 
   .pad.up,
   .pad.down {
-    left: 32px;
+    left: var(--touch-cell);
   }
 
   .pad.left,
   .pad.right {
-    top: 32px;
+    top: var(--touch-cell);
   }
 
   .mobile-actions {
-    right: max(8px, env(safe-area-inset-right));
-    bottom: max(8px, env(safe-area-inset-bottom));
-    grid-template-columns: repeat(3, 36px);
-    grid-auto-rows: 34px;
-    gap: 5px;
+    right: max(5px, env(safe-area-inset-right));
+    bottom: max(5px, env(safe-area-inset-bottom));
+    grid-template-columns: repeat(3, var(--touch-cell));
+    grid-auto-rows: var(--touch-cell);
+    gap: var(--touch-gap);
   }
 
   .touch-control {
     border-width: 1px;
+    background: rgba(12, 15, 20, 0.54);
     box-shadow:
       inset 0 0 0 1px rgba(255, 255, 255, 0.08),
       0 2px 0 rgba(0, 0, 0, 0.48);
@@ -413,25 +447,27 @@ body[data-game-mode="fight"] .fullscreen {
   .action,
   .start,
   .fullscreen {
-    font-size: 12px;
+    font-size: clamp(9px, 2.9dvh, 11px);
   }
 
   .action.primary {
-    width: 36px;
-    height: 36px;
-    margin-top: -2px;
+    width: calc(var(--touch-cell) + 2px);
+    height: calc(var(--touch-cell) + 2px);
+    margin-top: -1px;
   }
 
   .action.small {
-    font-size: 11px;
+    font-size: clamp(8px, 2.5dvh, 10px);
   }
 
   .start {
-    grid-column: 1 / 4;
+    grid-column: 3;
+    grid-row: 3;
   }
 
   .fullscreen {
     grid-column: 3;
+    grid-row: 2;
   }
 
   body[data-game-mode="fight"] .fullscreen {

@@ -12,7 +12,7 @@ ringImage.src = "assets/indiemania-ring.png";
 const ringFrontImage = new Image();
 ringFrontImage.src = "assets/indiemania-ring-front.png";
 const johnnyAtlas = new Image();
-johnnyAtlas.src = "assets/johnny-toxic-atlas.png?v=transparent-1";
+johnnyAtlas.src = "assets/johnny-toxic-expanded-atlas.png?v=expanded-2";
 const joeyAtlas = new Image();
 joeyAtlas.src = "assets/joey-image-atlas.png?v=full-template-1";
 const philAtlas = new Image();
@@ -39,11 +39,13 @@ const sfx = {
 const SPRITE_CELL = { w: 128, h: 150 };
 const JOHNNY_ANIMS = {
   idle: { row: 0, frames: 8, fps: 6 },
-  walk: { row: 1, frames: 8, fps: 9 },
-  run: { row: 1, frames: 8, fps: 13 },
+  walk: { row: 1, frames: 8, fps: 12 },
+  run: { row: 10, frames: 3, frameOffset: 1, fps: 12 },
   punch: { row: 2, frames: 4, fps: 10, once: true },
   kick: { row: 3, frames: 4, fps: 8, once: true },
   grapple: { row: 4, frames: 6, fps: 9, once: true },
+  grappleHold: { row: 4, frames: 6, fps: 6 },
+  grappled: { row: 4, frames: 6, fps: 6 },
   slam: { row: 5, frames: 4, fps: 7, once: true },
   finisher: { row: 5, frames: 5, fps: 6, once: true },
   pin: { row: 6, frames: 4, fps: 5, once: true },
@@ -51,7 +53,49 @@ const JOHNNY_ANIMS = {
   pinned: { row: 7, frames: 5, fps: 4, once: true },
   rise: { row: 7, frames: 5, fps: 5, once: true },
   whiff: { row: 2, frames: 2, fps: 9, once: true },
-  celebrate: { row: 8, frames: 3, fps: 4 }
+  celebrate: { row: 8, frames: 3, fps: 4 },
+  irishWhip: { row: 9, frames: 6, fps: 9, once: true },
+  whipped: { row: 10, frames: 4, fps: 8 },
+  rebound: { row: 11, frames: 6, fps: 11 },
+  clothesline: { row: 12, frames: 5, fps: 9, once: true },
+  clotheslineTake: { row: 13, frames: 5, fps: 8, once: true },
+  bigBoot: { row: 14, frames: 5, fps: 8, once: true },
+  bigBootTake: { row: 15, frames: 5, fps: 8, once: true },
+  ddt: { row: 16, frames: 6, fps: 8, once: true },
+  ddtTake: { row: 17, frames: 6, fps: 8, once: true },
+  bodyslam: { row: 18, frames: 6, fps: 8, once: true },
+  bodyslamTake: { row: 19, frames: 6, fps: 8, once: true },
+  powerbomb: { row: 20, frames: 7, fps: 8, once: true },
+  powerbombTake: { row: 21, frames: 7, fps: 8, once: true },
+  suplex: { row: 22, frames: 6, fps: 8, once: true },
+  suplexTake: { row: 23, frames: 6, fps: 8, once: true }
+};
+
+const ANIM_FALLBACKS = {
+  grappleHold: "grapple",
+  grappled: "grapple",
+  irishWhip: "grapple",
+  whipped: "run",
+  rebound: "run",
+  clothesline: "punch",
+  clotheslineTake: "down",
+  bigBoot: "kick",
+  bigBootTake: "down",
+  ddt: "slam",
+  ddtTake: "down",
+  bodyslam: "slam",
+  bodyslamTake: "down",
+  powerbomb: "finisher",
+  powerbombTake: "down",
+  suplex: "slam",
+  suplexTake: "down"
+};
+
+const GRAPPLE_MOVES = {
+  ddt: { attack: "ddt", take: "ddtTake", label: "DDT", damage: 16, momentum: 18, stun: 0.45, duration: 1.05, down: 2.2, force: 90 },
+  bodyslam: { attack: "bodyslam", take: "bodyslamTake", label: "bodyslam", damage: 18, momentum: 22, stun: 0.55, duration: 1.08, down: 2.7, force: 104 },
+  suplex: { attack: "suplex", take: "suplexTake", label: "suplex", damage: 20, momentum: 24, stun: 0.62, duration: 1.18, down: 3.0, force: 96 },
+  powerbomb: { attack: "powerbomb", take: "powerbombTake", label: "powerbomb", damage: 25, momentum: 30, stun: 0.8, duration: 1.28, down: 3.6, force: 116, momentumCost: 35 }
 };
 
 const state = {
@@ -99,9 +143,11 @@ const ringImageBounds = {
 
 const ringPlayBounds = {
   back: -176,
-  front: 6,
-  side: 224,
-  taper: 0.34
+  front: -18,
+  backLeft: -176,
+  backRight: 286,
+  frontLeft: -218,
+  frontRight: 218
 };
 
 const roster = [
@@ -263,6 +309,8 @@ function makeWrestler(template, side, isPlayer) {
     y: side === "left" ? -18 : -36,
     vx: 0,
     vy: 0,
+    air: 0,
+    moveMotion: null,
     face: side === "left" ? 1 : -1,
     stamina: 100,
     momentum: 0,
@@ -273,6 +321,7 @@ function makeWrestler(template, side, isPlayer) {
     action: null,
     actionTime: 0,
     actionDuration: 0,
+    animTime: 0,
     stun: 0,
     down: 0,
     block: false,
@@ -280,6 +329,9 @@ function makeWrestler(template, side, isPlayer) {
     pinCooldown: 0,
     grappleCooldown: 0,
     aiCooldown: 0,
+    whip: null,
+    pendingDown: null,
+    downHoldTime: 0,
     celebrate: 0
   };
 }
@@ -296,6 +348,7 @@ function startMatch(choiceIndex) {
   state.cpuChoice = cpuIndex;
   state.message = `${player.name} vs ${cpu.name}`;
   state.pin = null;
+  state.grapple = null;
   state.result = null;
   state.shake = 0;
   state.flash = 0;
@@ -314,7 +367,6 @@ function update(dt) {
   document.body.dataset.gameMode = state.mode;
   state.shake = Math.max(0, state.shake - dt * 18);
   state.flash = Math.max(0, state.flash - dt * 2.5);
-
   if (state.mode === "start") {
     updateStart();
     return;
@@ -339,6 +391,8 @@ function update(dt) {
   } else {
     updateFighterTimers(player, dt);
     updateFighterTimers(cpu, dt);
+    updateWhipMotion(player, cpu, dt);
+    updateWhipMotion(cpu, player, dt);
     updatePlayer(dt);
     updateCpu(dt);
     resolveMovement(player, cpu, dt);
@@ -420,18 +474,29 @@ function updateFighterTimers(f, dt) {
   f.pinCooldown = Math.max(0, f.pinCooldown - dt);
   f.grappleCooldown = Math.max(0, f.grappleCooldown - dt);
   f.aiCooldown = Math.max(0, f.aiCooldown - dt);
+  f.downHoldTime = Math.max(0, f.downHoldTime - dt);
   f.block = false;
+  updateMoveMotion(f);
+
+  if (f.pendingDown && f.actionTime === 0) {
+    f.down = Math.max(f.down, f.pendingDown.duration);
+    f.pendingDown = null;
+  }
 
   if (f.down > 0) {
     f.down = Math.max(0, f.down - dt * (0.42 + f.stamina / 145));
-    f.state = "down";
+    if (f.downHoldTime === 0) f.state = "down";
     f.vx *= 0.9;
     f.vy *= 0.9;
     if (f.down === 0) f.state = "rise";
     return;
   }
 
-  if (f.actionTime === 0 && ["punch", "kick", "grapple", "slam", "finisher", "whiff", "rise"].includes(f.state)) {
+  if (f.actionTime === 0 && [
+    "punch", "kick", "grapple", "grappleHold", "grappled", "slam", "finisher", "whiff", "rise",
+    "irishWhip", "clothesline", "bigBoot", "ddt", "ddtTake", "bodyslam", "bodyslamTake",
+    "powerbomb", "powerbombTake", "suplex", "suplexTake", "clotheslineTake", "bigBootTake"
+  ].includes(f.state)) {
     f.state = "idle";
     f.action = null;
     f.actionDuration = 0;
@@ -439,7 +504,40 @@ function updateFighterTimers(f, dt) {
 }
 
 function canAct(f) {
-  return f.actionTime === 0 && f.down === 0 && f.stun === 0 && !state.pin;
+  return f.actionTime === 0 && f.down === 0 && f.stun === 0 && !state.pin && !state.grapple && !f.whip;
+}
+
+function updateMoveMotion(f) {
+  if (!f.moveMotion) {
+    f.air = Math.max(0, f.air * 0.82);
+    return;
+  }
+
+  const m = f.moveMotion;
+  const elapsed = clamp(m.duration - f.actionTime, 0, m.duration);
+  const t = m.duration > 0 ? elapsed / m.duration : 1;
+  const eased = easeInOut(t);
+
+  if (m.type === "suplexTake") {
+    f.x = lerp(m.startX, m.endX, eased);
+    f.y = lerp(m.startY, m.endY, eased);
+    f.air = Math.sin(Math.PI * t) * 112;
+  } else if (m.type === "powerbombTake") {
+    const lift = t < 0.42 ? t / 0.42 : 1 - (t - 0.42) / 0.58;
+    f.x = lerp(m.startX, m.endX, eased);
+    f.y = lerp(m.startY, m.endY, eased);
+    f.air = Math.max(0, lift) * 124;
+  }
+
+  f.vx = 0;
+  f.vy = 0;
+
+  if (t >= 1) {
+    f.air = 0;
+    f.vx = m.landingVx;
+    f.vy = m.landingVy;
+    f.moveMotion = null;
+  }
 }
 
 function updatePlayer(dt) {
@@ -447,10 +545,11 @@ function updatePlayer(dt) {
   player.block = keys.has("Shift");
 
   const input = getMoveInput();
-  moveIntent(player, input.x, input.y, keys.has("c"), dt);
+  const running = keys.has("c");
+  moveIntent(player, input.x, input.y, running, dt);
 
-  if (pressed.has("z")) tryPunch(player, cpu);
-  if (pressed.has("v")) tryKick(player, cpu);
+  if (pressed.has("z")) running ? tryRunningStrike(player, cpu, "clothesline") : tryPunch(player, cpu);
+  if (pressed.has("v")) running ? tryRunningStrike(player, cpu, "bigBoot") : tryKick(player, cpu);
   if (pressed.has("x")) tryGrapple(player, cpu);
   if (pressed.has("s")) tryFinisher(player, cpu);
   if (pressed.has("a")) tryPin(player, cpu);
@@ -473,10 +572,12 @@ function updateCpu(dt) {
   state.cpuThink -= dt;
   const d = distance(cpu, player);
   const playerCrowded = isNearRingEdge(player) && d < 76;
+  const playerRebounding = player.whip?.phase === "return";
   if (state.cpuThink <= 0) {
     state.cpuThink = 0.34 + Math.random() * 0.52;
     if (player.down > 0 && d < 85 && cpu.pinCooldown === 0) state.cpuIntent = "pin";
     else if (cpu.momentum >= 100 && d < 70) state.cpuIntent = "finisher";
+    else if (playerRebounding && d < 118) state.cpuIntent = Math.random() < 0.55 ? "clothesline" : "bigBoot";
     else if (playerCrowded && Math.random() < 0.72) state.cpuIntent = "retreat";
     else if (d < 56 && cpu.grappleCooldown === 0 && Math.random() < 0.16) state.cpuIntent = "grapple";
     else if (d < 82 && Math.random() < 0.26) state.cpuIntent = "kick";
@@ -489,6 +590,8 @@ function updateCpu(dt) {
   if (state.cpuIntent === "grapple") tryGrapple(cpu, player);
   if (state.cpuIntent === "punch") tryPunch(cpu, player);
   if (state.cpuIntent === "kick") tryKick(cpu, player);
+  if (state.cpuIntent === "clothesline") tryRunningStrike(cpu, player, "clothesline");
+  if (state.cpuIntent === "bigBoot") tryRunningStrike(cpu, player, "bigBoot");
 
   let tx = player.x - cpu.x;
   let ty = player.y - cpu.y;
@@ -496,9 +599,9 @@ function updateCpu(dt) {
     tx = -tx;
     ty = -ty;
   }
-  if (state.cpuIntent === "approach" || state.cpuIntent === "retreat") {
+  if (state.cpuIntent === "approach" || state.cpuIntent === "retreat" || state.cpuIntent === "clothesline" || state.cpuIntent === "bigBoot") {
     const len = Math.hypot(tx, ty) || 1;
-    moveIntent(cpu, tx / len, ty / len, false, dt);
+    moveIntent(cpu, tx / len, ty / len, playerRebounding, dt);
   } else {
     moveIntent(cpu, 0, 0, false, dt);
   }
@@ -506,8 +609,8 @@ function updateCpu(dt) {
 
 function moveIntent(f, ix, iy, running, dt) {
   const moving = Math.hypot(ix, iy) > 0;
-  const topSpeed = (running ? 176 : 112) * f.speed * (f.block ? 0.52 : 1);
-  const accel = running ? 410 : 270;
+  const topSpeed = (running ? 290 : 112) * f.speed * (f.block ? 0.52 : 1);
+  const accel = running ? 760 : 270;
   const drag = moving ? 0.88 : 0.78;
 
   f.vx = f.vx * drag + ix * accel * dt;
@@ -518,24 +621,64 @@ function moveIntent(f, ix, iy, running, dt) {
     f.vy = (f.vy / speed) * topSpeed;
   }
 
-  if (moving) f.face = ix !== 0 ? Math.sign(ix) : f.face;
-  if (moving && f.state === "idle") f.state = running ? "run" : "walk";
+  if (moving) {
+    f.face = ix !== 0 ? Math.sign(ix) : f.face;
+    f.animTime += dt * (running ? 1.85 : 1);
+  }
+  if (moving && ["idle", "walk", "run"].includes(f.state)) f.state = running ? "run" : "walk";
   if (!moving && ["walk", "run"].includes(f.state)) f.state = "idle";
   if (running && moving) f.stamina = Math.max(0, f.stamina - dt * 2.7);
 }
 
 function resolveMovement(f, other, dt) {
-  if (f.actionTime > 0 && f.state !== "down") {
+  if (f.actionTime > 0 && f.state !== "down" && f.state !== "whipped" && f.state !== "rebound") {
     f.vx *= 0.88;
     f.vy *= 0.88;
   }
   f.x += f.vx * dt;
   f.y += f.vy * dt;
 
-  const maxX = ringPlayBounds.side - Math.max(0, Math.abs(f.y) - 24) * ringPlayBounds.taper;
-  f.x = clamp(f.x, -maxX, maxX);
+  const limits = ringLimitsForY(f.y);
+  f.x = clamp(f.x, limits.left, limits.right);
   f.y = clamp(f.y, ringPlayBounds.back, ringPlayBounds.front);
-  f.face = other.x >= f.x ? 1 : -1;
+  if (!isMoveLocked(f)) f.face = other.x >= f.x ? 1 : -1;
+}
+
+function updateWhipMotion(f, other, dt) {
+  if (!f.whip) return;
+
+  f.whip.timer += dt;
+  f.animTime += dt * 1.85;
+  f.stun = Math.max(f.stun, 0.08);
+  const limits = ringLimitsForY(f.y);
+  const targetSide = f.whip.side || Math.sign(f.vx || f.face || 1);
+  const ropeX = targetSide > 0 ? limits.right : limits.left;
+  const hitSide = targetSide > 0 ? f.x >= ropeX - 8 : f.x <= ropeX + 8;
+
+  if (f.whip.phase === "out" && (hitSide || f.whip.timer > 1.18)) {
+    f.x = ropeX;
+    const target = f.whip.returnTarget || other;
+    const tx = target.x - f.x;
+    const ty = target.y - f.y;
+    const len = Math.hypot(tx, ty) || 1;
+    f.whip.phase = "return";
+    f.whip.timer = 0;
+    f.state = "rebound";
+    f.actionTime = 0.3;
+    f.actionDuration = 0.3;
+    f.vx = (tx / len) * 385;
+    f.vy = (ty / len) * 385;
+    f.face = Math.sign(f.vx || f.face);
+    state.message = `${f.name} rebounds off the ropes`;
+    return;
+  }
+
+  if (f.whip.phase === "return" && (f.whip.timer > 1.2 || distance(f, other) < 28)) {
+    f.whip = null;
+    f.state = "idle";
+    f.stun = 0;
+    f.actionTime = 0;
+  }
 }
 
 function separateFighters() {
@@ -584,20 +727,44 @@ function tryKick(attacker, defender) {
   }
 }
 
+function tryRunningStrike(attacker, defender, type) {
+  if (!canAct(attacker)) return;
+  const isBoot = type === "bigBoot";
+  attacker.state = isBoot ? "bigBoot" : "clothesline";
+  attacker.action = attacker.state;
+  attacker.actionTime = isBoot ? 0.58 : 0.52;
+  attacker.actionDuration = attacker.actionTime;
+  const reboundBonus = defender.whip?.phase === "return";
+  const range = isBoot ? 86 : 78;
+  if (inRange(attacker, defender, range)) {
+    const damage = (isBoot ? 15 : 13) + (reboundBonus ? 8 : 0);
+    const takeState = isBoot ? "bigBootTake" : "clotheslineTake";
+    defender.state = takeState;
+    defender.action = takeState;
+    defender.actionTime = reboundBonus ? 0.72 : 0.48;
+    defender.actionDuration = defender.actionTime;
+    defender.pendingDown = reboundBonus ? { duration: 2.6 + (100 - defender.stamina) / 48 } : null;
+    defender.whip = null;
+    hit(attacker, defender, damage, reboundBonus ? 28 : 18, reboundBonus ? 0.45 : 0.32, false);
+    knockAway(attacker, defender, reboundBonus ? 180 : 92);
+    playSound(isBoot ? "kick" : "punch");
+    state.message = `${attacker.name} hits a ${isBoot ? "big boot" : "clothesline"}`;
+  } else {
+    whiff(attacker, `${attacker.name} misses the ${isBoot ? "big boot" : "clothesline"}`);
+  }
+}
+
 function tryGrapple(attacker, defender) {
   if (!canAct(attacker) || attacker.grappleCooldown > 0) return;
   attacker.state = "grapple";
-  attacker.actionTime = 0.82;
+  attacker.actionTime = 1.25;
   attacker.actionDuration = attacker.actionTime;
   attacker.action = "grapple";
   attacker.grappleCooldown = attacker.isPlayer ? 0.45 : 1.65;
   if (inRange(attacker, defender, 78)) {
-    const slamReady = attacker.isPlayer
-      ? defender.stun > 0 || defender.stamina < 42
-      : (defender.stun > 0 && attacker.momentum >= 28) || defender.stamina < 30;
     defender.state = "grapple";
     defender.action = "grappled";
-    defender.actionTime = 0.82;
+    defender.actionTime = 1.25;
     defender.actionDuration = defender.actionTime;
     defender.stun = Math.max(defender.stun, 0.5);
     attacker.vx = 0;
@@ -608,12 +775,14 @@ function tryGrapple(attacker, defender) {
       attacker,
       defender,
       timer: 0,
-      resolveAt: 0.56,
-      slam: slamReady,
+      resolveAt: attacker.isPlayer ? 0.95 : 0.58,
+      move: attacker.isPlayer ? null : chooseCpuGrappleMove(attacker, defender),
       resolved: false
     };
     positionGrapple(attacker, defender);
-    state.message = `${attacker.name} locks up`;
+    state.message = attacker.isPlayer
+      ? "Grapple: Z DDT, X bodyslam, V suplex, C whip, S powerbomb"
+      : `${attacker.name} locks up`;
   } else {
     whiff(attacker, `${attacker.name} grabs air`);
   }
@@ -625,39 +794,123 @@ function updateGrapple(dt) {
   positionGrapple(grapple.attacker, grapple.defender);
   grapple.attacker.actionTime = Math.max(0, grapple.attacker.actionDuration - grapple.timer);
   grapple.defender.actionTime = Math.max(0, grapple.defender.actionDuration - grapple.timer);
-  grapple.attacker.state = grapple.resolved ? grapple.attacker.state : "grapple";
-  grapple.defender.state = grapple.resolved ? grapple.defender.state : "grapple";
+  grapple.attacker.state = grapple.resolved ? grapple.attacker.state : "grappleHold";
+  grapple.defender.state = grapple.resolved ? grapple.defender.state : "grappled";
 
-  if (!grapple.resolved && grapple.timer >= grapple.resolveAt) {
+  if (!grapple.move && grapple.attacker.isPlayer) {
+    if (pressed.has("c") || keys.has("c")) grapple.move = "irishWhip";
+    else if (pressed.has("z")) grapple.move = "ddt";
+    else if (pressed.has("x")) grapple.move = "bodyslam";
+    else if (pressed.has("v")) grapple.move = "suplex";
+    else if (pressed.has("s") && grapple.attacker.momentum >= GRAPPLE_MOVES.powerbomb.momentumCost) grapple.move = "powerbomb";
+  }
+
+  if (!grapple.resolved && (grapple.move || grapple.timer >= grapple.resolveAt)) {
     grapple.resolved = true;
-    if (grapple.slam) {
-      grapple.attacker.state = "slam";
-      grapple.attacker.action = "slam";
-      grapple.attacker.actionTime = 0.72;
-      grapple.attacker.actionDuration = grapple.attacker.actionTime;
-      hit(grapple.attacker, grapple.defender, 18, 24, 0.9, true);
-      knockAway(grapple.attacker, grapple.defender, grapple.attacker.isPlayer ? 150 : 112);
-      if (!grapple.attacker.isPlayer) grapple.attacker.grappleCooldown = 2.6;
-      playSound("slam");
-      state.message = `${grapple.attacker.name} hits a heavy slam`;
-    } else {
-      hit(grapple.attacker, grapple.defender, 12, 18, 0.55, false);
-      grapple.attacker.actionTime = 0.28;
-      grapple.defender.actionTime = 0.32;
-      playSound("punch");
-      state.message = `${grapple.attacker.name} wins the grapple`;
-    }
+    resolveGrappleMove(grapple, grapple.move || "bodyslam");
     state.grapple = null;
   }
+}
+
+function chooseCpuGrappleMove(attacker, defender) {
+  if (attacker.momentum >= 45 && defender.stamina < 55 && Math.random() < 0.35) return "powerbomb";
+  if (isNearRingEdge(defender) && Math.random() < 0.45) return "irishWhip";
+  const moves = defender.stamina < 45 ? ["ddt", "bodyslam", "suplex"] : ["irishWhip", "ddt", "bodyslam", "suplex"];
+  return moves[Math.floor(Math.random() * moves.length)];
+}
+
+function resolveGrappleMove(grapple, moveId) {
+  const { attacker, defender } = grapple;
+  if (moveId === "irishWhip") {
+    executeIrishWhip(attacker, defender);
+    return;
+  }
+
+  const move = GRAPPLE_MOVES[moveId] ?? GRAPPLE_MOVES.bodyslam;
+  if (move.momentumCost) attacker.momentum = Math.max(0, attacker.momentum - move.momentumCost);
+  attacker.state = move.attack;
+  attacker.action = move.attack;
+  attacker.actionTime = move.duration;
+  attacker.actionDuration = move.duration;
+  defender.state = move.take;
+  defender.action = move.take;
+  defender.actionTime = move.duration;
+  defender.actionDuration = move.duration;
+  defender.pendingDown = { duration: move.down };
+  defender.downHoldTime = move.duration + 0.22;
+  defender.moveMotion = createTakeMoveMotion(moveId, attacker, defender, move.duration);
+  hit(attacker, defender, move.damage, move.momentum, move.stun, false);
+  if (!defender.moveMotion) knockAway(attacker, defender, move.force);
+  if (!attacker.isPlayer) attacker.grappleCooldown = 2.4;
+  playSound("slam");
+  state.message = `${attacker.name} hits a ${move.label}`;
+}
+
+function createTakeMoveMotion(moveId, attacker, defender, duration) {
+  const side = attacker.face || (defender.x >= attacker.x ? 1 : -1);
+  const limits = ringLimitsForY(attacker.y);
+  if (moveId === "suplex") {
+    return {
+      type: "suplexTake",
+      duration,
+      startX: defender.x,
+      startY: defender.y,
+      endX: clamp(attacker.x - side * 58, limits.left, limits.right),
+      endY: clamp(attacker.y + 4, ringPlayBounds.back, ringPlayBounds.front),
+      landingVx: -side * 42,
+      landingVy: 0
+    };
+  }
+  if (moveId === "powerbomb") {
+    return {
+      type: "powerbombTake",
+      duration,
+      startX: defender.x,
+      startY: defender.y,
+      endX: clamp(attacker.x + side * 46, limits.left, limits.right),
+      endY: clamp(attacker.y + 6, ringPlayBounds.back, ringPlayBounds.front),
+      landingVx: side * 56,
+      landingVy: 0
+    };
+  }
+  return null;
+}
+
+function executeIrishWhip(attacker, defender) {
+  const side = -(attacker.face || (defender.x >= attacker.x ? 1 : -1));
+  const targetY = clamp(defender.y + (attacker.y - defender.y) * 0.35, ringPlayBounds.back + 18, ringPlayBounds.front - 18);
+  attacker.state = "irishWhip";
+  attacker.action = "irishWhip";
+  attacker.actionTime = 0.55;
+  attacker.actionDuration = attacker.actionTime;
+  defender.state = "whipped";
+  defender.action = "whipped";
+  defender.actionTime = 0.7;
+  defender.actionDuration = defender.actionTime;
+  defender.stun = Math.max(defender.stun, 0.4);
+  defender.y = targetY;
+  defender.whip = {
+    phase: "out",
+    timer: 0,
+    side,
+    source: attacker,
+    returnTarget: { x: attacker.x, y: attacker.y }
+  };
+  defender.vx = side * 430;
+  defender.vy = 0;
+  defender.face = side;
+  if (!attacker.isPlayer) attacker.grappleCooldown = 2.1;
+  attacker.momentum = clamp(attacker.momentum + 12, 0, 100);
+  state.message = `${attacker.name} sends ${defender.name} to the ropes`;
 }
 
 function positionGrapple(attacker, defender) {
   const side = attacker.x <= defender.x ? 1 : -1;
   const midX = (attacker.x + defender.x) / 2;
   const midY = (attacker.y + defender.y) / 2;
-  const maxX = ringPlayBounds.side - Math.max(0, Math.abs(midY) - 24) * ringPlayBounds.taper;
-  attacker.x = clamp(midX - side * 13, -maxX, maxX);
-  defender.x = clamp(midX + side * 13, -maxX, maxX);
+  const limits = ringLimitsForY(midY);
+  attacker.x = clamp(midX - side * 13, limits.left, limits.right);
+  defender.x = clamp(midX + side * 13, limits.left, limits.right);
   attacker.y = clamp(midY - 2, ringPlayBounds.back, ringPlayBounds.front);
   defender.y = clamp(midY + 2, ringPlayBounds.back, ringPlayBounds.front);
   attacker.face = side;
@@ -669,8 +922,8 @@ function positionGrapple(attacker, defender) {
 }
 
 function isNearRingEdge(f) {
-  const maxX = ringPlayBounds.side - Math.max(0, Math.abs(f.y) - 24) * ringPlayBounds.taper;
-  return Math.abs(f.x) > maxX - 34 || f.y < ringPlayBounds.back + 28 || f.y > ringPlayBounds.front - 24;
+  const limits = ringLimitsForY(f.y);
+  return f.x < limits.left + 34 || f.x > limits.right - 34 || f.y < ringPlayBounds.back + 28 || f.y > ringPlayBounds.front - 24;
 }
 
 function tryFinisher(attacker, defender) {
@@ -700,8 +953,12 @@ function tryPin(attacker, defender) {
   defender.state = "down";
   attacker.vx = 0;
   attacker.vy = 0;
+  attacker.air = 0;
+  attacker.moveMotion = null;
   defender.vx = 0;
   defender.vy = 0;
+  defender.air = 0;
+  defender.moveMotion = null;
   state.pin = {
     attacker,
     defender,
@@ -751,9 +1008,9 @@ function updatePin(dt) {
 
 function positionPinAttacker(attacker, defender) {
   const side = attacker.x <= defender.x ? -1 : 1;
-  const maxX = ringPlayBounds.side - Math.max(0, Math.abs(defender.y) - 24) * ringPlayBounds.taper;
-  attacker.x = clamp(defender.x + side * 10, -maxX, maxX);
-  attacker.y = clamp(defender.y - 42, ringPlayBounds.back, ringPlayBounds.front);
+  const limits = ringLimitsForY(defender.y);
+  attacker.x = clamp(defender.x + side * 6, limits.left, limits.right);
+  attacker.y = clamp(defender.y - 14, ringPlayBounds.back, ringPlayBounds.front);
   attacker.face = side * -1;
   defender.face = side;
 }
@@ -811,6 +1068,14 @@ function knockAway(attacker, defender, force) {
   const len = Math.hypot(dx, dy) || 1;
   defender.vx += (dx / len) * force;
   defender.vy += (dy / len) * force;
+}
+
+function lerp(a, b, t) {
+  return a + (b - a) * t;
+}
+
+function easeInOut(t) {
+  return t * t * (3 - 2 * t);
 }
 
 function inRange(a, b, range) {
@@ -1237,9 +1502,11 @@ function drawSelect() {
     ctx.fillText(`Player: ${roster[state.playerChoice].name}`, W / 2, 144);
   }
 
-  roster.forEach((r, i) => {
+  getVisibleRosterIndexes().forEach((i, visibleSlot) => {
+    const r = roster[i];
     const gap = 250;
-    const x = W / 2 - ((roster.length - 1) * gap) / 2 + i * gap;
+    const visibleCount = Math.min(roster.length, 3);
+    const x = W / 2 - ((visibleCount - 1) * gap) / 2 + visibleSlot * gap;
     const y = 352;
     const isSelected = state.selectedIndex === i;
     const isPlayerChoice = choosingCpu && state.playerChoice === i;
@@ -1264,7 +1531,13 @@ function drawSelect() {
 
   ctx.fillStyle = "#f4c44f";
   ctx.font = "18px Arial";
+  ctx.fillText(`${state.selectedIndex + 1} / ${roster.length}`, W / 2, 532);
   ctx.fillText(choosingCpu ? "Arrow keys choose opponent. Enter confirms. Esc backs up." : "Arrow keys choose player. Enter confirms.", W / 2, 562);
+}
+
+function getVisibleRosterIndexes() {
+  if (roster.length <= 3) return roster.map((_, i) => i);
+  return [-1, 0, 1].map((offset) => (state.selectedIndex + offset + roster.length) % roster.length);
 }
 
 function drawArenaSelect() {
@@ -1375,28 +1648,31 @@ function getSpriteAtlas(f) {
 }
 
 function drawSpriteWrestler(f, p, scale, atlas) {
-  const pose = JOHNNY_ANIMS[f.state] ? f.state : "idle";
+  const pose = resolveSpritePose(f.state, atlas);
   const anim = JOHNNY_ANIMS[pose];
   const holdLastFrame = ["pin", "pinned", "down", "rise"].includes(pose);
+  const loopTime = pose === "walk" || pose === "run" || pose === "rebound" || pose === "whipped"
+    ? f.animTime
+    : performance.now() / 1000;
   const elapsed = anim.once && f.actionDuration > 0
     ? Math.max(0, f.actionDuration - f.actionTime)
-    : performance.now() / 1000;
+    : loopTime;
   const frame = anim.once && f.actionDuration > 0
     ? Math.min(anim.frames - 1, Math.floor((elapsed / f.actionDuration) * anim.frames))
     : holdLastFrame
       ? anim.frames - 1
       : Math.floor(elapsed * anim.fps) % anim.frames;
-  const sx = frame * SPRITE_CELL.w;
+  const sx = ((anim.frameOffset || 0) + frame) * SPRITE_CELL.w;
   const sy = anim.row * SPRITE_CELL.h;
   const spriteScale = scale * 1.16;
 
   ctx.save();
-  ctx.translate(p.x, p.y);
-  ctx.scale(f.face, 1);
   ctx.fillStyle = "rgba(0,0,0,.36)";
   ctx.beginPath();
-  ctx.ellipse(0, 24 * scale, 30 * scale, 9 * scale, 0, 0, Math.PI * 2);
+  ctx.ellipse(p.x, p.y + 24 * scale, 30 * scale, 9 * scale, 0, 0, Math.PI * 2);
   ctx.fill();
+  ctx.translate(p.x, p.y - f.air * scale);
+  ctx.scale(f.face, 1);
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(
     atlas,
@@ -1420,15 +1696,25 @@ function drawSpriteWrestler(f, p, scale, atlas) {
   }
 }
 
+function resolveSpritePose(stateName, atlas) {
+  let pose = JOHNNY_ANIMS[stateName] ? stateName : "idle";
+  while (JOHNNY_ANIMS[pose] && (JOHNNY_ANIMS[pose].row + 1) * SPRITE_CELL.h > atlas.naturalHeight) {
+    pose = ANIM_FALLBACKS[pose] || "idle";
+    if (pose === stateName) return "idle";
+    stateName = pose;
+  }
+  return JOHNNY_ANIMS[pose] ? pose : "idle";
+}
+
 function drawBlockWrestler(f, p, scale) {
   const pose = f.state;
   ctx.save();
-  ctx.translate(p.x, p.y);
-  ctx.scale(scale * f.face, scale);
   ctx.fillStyle = "rgba(0,0,0,.35)";
   ctx.beginPath();
-  ctx.ellipse(0, 26, pose === "down" || pose === "pinned" ? 52 : 30, 13, 0, 0, Math.PI * 2);
+  ctx.ellipse(p.x, p.y + 26 * scale, (pose === "down" || pose === "pinned" ? 52 : 30) * scale, 13 * scale, 0, 0, Math.PI * 2);
   ctx.fill();
+  ctx.translate(p.x, p.y - f.air * scale);
+  ctx.scale(scale * f.face, scale);
 
   if (pose === "down" || pose === "pinned") {
     ctx.rotate(-0.08);
@@ -1544,6 +1830,20 @@ function drawTitle(y) {
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
+}
+
+function isMoveLocked(f) {
+  return f.actionTime > 0 || !!f.moveMotion || [
+    "irishWhip", "ddt", "ddtTake", "bodyslam", "bodyslamTake", "powerbomb", "powerbombTake", "suplex", "suplexTake"
+  ].includes(f.state);
+}
+
+function ringLimitsForY(y) {
+  const depth = clamp((y - ringPlayBounds.back) / (ringPlayBounds.front - ringPlayBounds.back), 0, 1);
+  return {
+    left: lerp(ringPlayBounds.backLeft, ringPlayBounds.frontLeft, depth),
+    right: lerp(ringPlayBounds.backRight, ringPlayBounds.frontRight, depth)
+  };
 }
 
 requestAnimationFrame(gameLoop);
