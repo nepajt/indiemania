@@ -144,10 +144,11 @@ const ringImageBounds = {
 const ringPlayBounds = {
   back: -176,
   front: -18,
-  backLeft: -176,
-  backRight: 286,
-  frontLeft: -218,
-  frontRight: 218
+  backLeft: -166,
+  backRight: 268,
+  frontLeft: -210,
+  frontRight: 210,
+  bodyInset: 34
 };
 
 const roster = [
@@ -638,7 +639,7 @@ function resolveMovement(f, other, dt) {
   f.x += f.vx * dt;
   f.y += f.vy * dt;
 
-  const limits = ringLimitsForY(f.y);
+  const limits = ringLimitsForY(f.y, ringPlayBounds.bodyInset);
   f.x = clamp(f.x, limits.left, limits.right);
   f.y = clamp(f.y, ringPlayBounds.back, ringPlayBounds.front);
   if (!isMoveLocked(f)) f.face = other.x >= f.x ? 1 : -1;
@@ -848,7 +849,7 @@ function resolveGrappleMove(grapple, moveId) {
 
 function createTakeMoveMotion(moveId, attacker, defender, duration) {
   const side = attacker.face || (defender.x >= attacker.x ? 1 : -1);
-  const limits = ringLimitsForY(attacker.y);
+  const limits = ringLimitsForY(attacker.y, ringPlayBounds.bodyInset);
   if (moveId === "suplex") {
     return {
       type: "suplexTake",
@@ -908,7 +909,7 @@ function positionGrapple(attacker, defender) {
   const side = attacker.x <= defender.x ? 1 : -1;
   const midX = (attacker.x + defender.x) / 2;
   const midY = (attacker.y + defender.y) / 2;
-  const limits = ringLimitsForY(midY);
+  const limits = ringLimitsForY(midY, ringPlayBounds.bodyInset);
   attacker.x = clamp(midX - side * 13, limits.left, limits.right);
   defender.x = clamp(midX + side * 13, limits.left, limits.right);
   attacker.y = clamp(midY - 2, ringPlayBounds.back, ringPlayBounds.front);
@@ -922,7 +923,7 @@ function positionGrapple(attacker, defender) {
 }
 
 function isNearRingEdge(f) {
-  const limits = ringLimitsForY(f.y);
+  const limits = ringLimitsForY(f.y, ringPlayBounds.bodyInset);
   return f.x < limits.left + 34 || f.x > limits.right - 34 || f.y < ringPlayBounds.back + 28 || f.y > ringPlayBounds.front - 24;
 }
 
@@ -1008,7 +1009,7 @@ function updatePin(dt) {
 
 function positionPinAttacker(attacker, defender) {
   const side = attacker.x <= defender.x ? -1 : 1;
-  const limits = ringLimitsForY(defender.y);
+  const limits = ringLimitsForY(defender.y, ringPlayBounds.bodyInset);
   attacker.x = clamp(defender.x + side * 6, limits.left, limits.right);
   attacker.y = clamp(defender.y - 14, ringPlayBounds.back, ringPlayBounds.front);
   attacker.face = side * -1;
@@ -1838,11 +1839,11 @@ function isMoveLocked(f) {
   ].includes(f.state);
 }
 
-function ringLimitsForY(y) {
+function ringLimitsForY(y, inset = 0) {
   const depth = clamp((y - ringPlayBounds.back) / (ringPlayBounds.front - ringPlayBounds.back), 0, 1);
   return {
-    left: lerp(ringPlayBounds.backLeft, ringPlayBounds.frontLeft, depth),
-    right: lerp(ringPlayBounds.backRight, ringPlayBounds.frontRight, depth)
+    left: lerp(ringPlayBounds.backLeft, ringPlayBounds.frontLeft, depth) + inset,
+    right: lerp(ringPlayBounds.backRight, ringPlayBounds.frontRight, depth) - inset
   };
 }
 
