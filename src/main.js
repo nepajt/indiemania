@@ -553,8 +553,8 @@ function updatePlayer(dt) {
   moveIntent(player, input.x, input.y, running, dt);
 
   if (pressed.has("z")) running ? tryRunningStrike(player, cpu, "clothesline") : tryPunch(player, cpu);
-  if (pressed.has("v")) running ? tryRunningStrike(player, cpu, "bigBoot") : tryKick(player, cpu);
-  if (pressed.has("x")) tryGrapple(player, cpu);
+  if (pressed.has("x")) running ? tryRunningStrike(player, cpu, "bigBoot") : tryKick(player, cpu);
+  if (pressed.has("v")) tryGrapple(player, cpu);
   if (pressed.has("s")) tryFinisher(player, cpu);
   if (pressed.has("a")) tryPin(player, cpu);
 }
