@@ -331,6 +331,7 @@ function makeWrestler(template, side, isPlayer) {
     grappleCooldown: 0,
     aiCooldown: 0,
     whip: null,
+    whipPivot: null,
     pendingDown: null,
     downHoldTime: 0,
     celebrate: 0
@@ -478,6 +479,7 @@ function updateFighterTimers(f, dt) {
   f.downHoldTime = Math.max(0, f.downHoldTime - dt);
   f.block = false;
   updateMoveMotion(f);
+  updateWhipPivot(f);
 
   if (f.pendingDown && f.actionTime === 0) {
     f.down = Math.max(f.down, f.pendingDown.duration);
@@ -501,6 +503,7 @@ function updateFighterTimers(f, dt) {
     f.state = "idle";
     f.action = null;
     f.actionDuration = 0;
+    f.whipPivot = null;
   }
 }
 
@@ -651,6 +654,24 @@ function updateWhipMotion(f, other, dt) {
   f.whip.timer += dt;
   f.animTime += dt * 1.85;
   f.stun = Math.max(f.stun, 0.08);
+  if (f.whip.phase === "windup") {
+    const source = f.whip.source || other;
+    const side = f.whip.side || Math.sign(f.face || 1);
+    const limits = ringLimitsForY(source.y, ringPlayBounds.bodyInset);
+    f.x = clamp(source.x + side * 26, limits.left, limits.right);
+    f.y = clamp(source.y + 2, ringPlayBounds.back, ringPlayBounds.front);
+    f.vx = 0;
+    f.vy = 0;
+    f.face = side;
+    if (f.whip.timer >= f.whip.releaseAt) {
+      f.whip.phase = "out";
+      f.whip.timer = 0;
+      f.vx = side * 430;
+      f.vy = 0;
+    }
+    return;
+  }
+
   const limits = ringLimitsForY(f.y);
   const targetSide = f.whip.side || Math.sign(f.vx || f.face || 1);
   const ropeX = targetSide > 0 ? limits.right : limits.left;
@@ -882,22 +903,27 @@ function executeIrishWhip(attacker, defender) {
   const targetY = clamp(defender.y + (attacker.y - defender.y) * 0.35, ringPlayBounds.back + 18, ringPlayBounds.front - 18);
   attacker.state = "irishWhip";
   attacker.action = "irishWhip";
-  attacker.actionTime = 0.55;
+  attacker.actionTime = 0.62;
   attacker.actionDuration = attacker.actionTime;
+  attacker.whipPivot = {
+    at: 0.18,
+    face: side
+  };
   defender.state = "whipped";
   defender.action = "whipped";
-  defender.actionTime = 0.7;
+  defender.actionTime = 0.78;
   defender.actionDuration = defender.actionTime;
   defender.stun = Math.max(defender.stun, 0.4);
   defender.y = targetY;
   defender.whip = {
-    phase: "out",
+    phase: "windup",
     timer: 0,
+    releaseAt: 0.18,
     side,
     source: attacker,
     returnTarget: { x: attacker.x, y: attacker.y }
   };
-  defender.vx = side * 430;
+  defender.vx = 0;
   defender.vy = 0;
   defender.face = side;
   if (!attacker.isPlayer) attacker.grappleCooldown = 2.1;
@@ -1837,6 +1863,15 @@ function isMoveLocked(f) {
   return f.actionTime > 0 || !!f.moveMotion || [
     "irishWhip", "ddt", "ddtTake", "bodyslam", "bodyslamTake", "powerbomb", "powerbombTake", "suplex", "suplexTake"
   ].includes(f.state);
+}
+
+function updateWhipPivot(f) {
+  if (!f.whipPivot || f.actionDuration <= 0) return;
+  const elapsed = f.actionDuration - f.actionTime;
+  if (elapsed >= f.whipPivot.at) {
+    f.face = f.whipPivot.face;
+    f.whipPivot = null;
+  }
 }
 
 function ringLimitsForY(y, inset = 0) {
