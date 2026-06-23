@@ -4,7 +4,7 @@ from PIL import Image
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = Path(r"C:\Users\offic\Downloads\NEW Johnny Toxic.png")
+SOURCE = Path(r"C:\Users\offic\Downloads\Johnny Toxic (1).png")
 OUT = ROOT / "assets" / "johnny-toxic-expanded-atlas.png"
 
 CELL_W = 128
@@ -17,7 +17,7 @@ ROW_Y = TOP + 55
 
 ROWS = [
     8, 8, 4, 4, 6, 5, 4, 5, 3,
-    6, 4, 6, 5, 5, 5, 5, 6, 6,
+    6, 6, 6, 5, 5, 5, 5, 6, 6,
     6, 6, 7, 7, 6, 6,
 ]
 

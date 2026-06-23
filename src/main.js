@@ -12,7 +12,7 @@ ringImage.src = "assets/indiemania-ring.png";
 const ringFrontImage = new Image();
 ringFrontImage.src = "assets/indiemania-ring-front.png";
 const johnnyAtlas = new Image();
-johnnyAtlas.src = "assets/johnny-toxic-expanded-atlas.png?v=expanded-2";
+johnnyAtlas.src = "assets/johnny-toxic-expanded-atlas.png?v=run-row-6-1";
 const joeyAtlas = new Image();
 joeyAtlas.src = "assets/joey-image-atlas.png?v=full-template-1";
 const philAtlas = new Image();
@@ -40,7 +40,7 @@ const SPRITE_CELL = { w: 128, h: 150 };
 const JOHNNY_ANIMS = {
   idle: { row: 0, frames: 8, fps: 6 },
   walk: { row: 1, frames: 8, fps: 12 },
-  run: { row: 10, frames: 3, frameOffset: 1, fps: 12 },
+  run: { row: 10, frames: 6, fps: 13 },
   punch: { row: 2, frames: 4, fps: 10, once: true },
   kick: { row: 3, frames: 4, fps: 8, once: true },
   grapple: { row: 4, frames: 6, fps: 9, once: true },
@@ -55,7 +55,7 @@ const JOHNNY_ANIMS = {
   whiff: { row: 2, frames: 2, fps: 9, once: true },
   celebrate: { row: 8, frames: 3, fps: 4 },
   irishWhip: { row: 9, frames: 6, fps: 9, once: true },
-  whipped: { row: 10, frames: 4, fps: 8 },
+  whipped: { row: 10, frames: 6, fps: 10 },
   rebound: { row: 11, frames: 6, fps: 11 },
   clothesline: { row: 12, frames: 5, fps: 9, once: true },
   clotheslineTake: { row: 13, frames: 5, fps: 8, once: true },
@@ -1860,8 +1860,8 @@ function clamp(value, min, max) {
 }
 
 function isMoveLocked(f) {
-  return f.actionTime > 0 || !!f.moveMotion || [
-    "irishWhip", "ddt", "ddtTake", "bodyslam", "bodyslamTake", "powerbomb", "powerbombTake", "suplex", "suplexTake"
+  return f.actionTime > 0 || f.down > 0 || !!f.moveMotion || [
+    "down", "pinned", "rise", "irishWhip", "ddt", "ddtTake", "bodyslam", "bodyslamTake", "powerbomb", "powerbombTake", "suplex", "suplexTake"
   ].includes(f.state);
 }
 
