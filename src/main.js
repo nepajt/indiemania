@@ -1836,23 +1836,13 @@ function drawMessage() {
 function drawResult() {
   ctx.fillStyle = "rgba(0,0,0,.7)";
   ctx.fillRect(0, 0, W, H);
-  drawTitle(180);
   ctx.textAlign = "center";
   ctx.fillStyle = state.result === "win" ? "#f4c44f" : "#e74846";
-  ctx.font = "54px Impact";
-  ctx.fillText(state.result === "win" ? "Victory by Pinfall" : "Defeat by Pinfall", W / 2, 300);
+  ctx.font = "46px Impact";
+  ctx.fillText(state.result === "win" ? "Victory by Pinfall" : "Defeat by Pinfall", W / 2, 178);
   ctx.fillStyle = "#f5ead8";
   ctx.font = "22px Arial";
-  ctx.fillText("Press Enter / START for main menu", W / 2, 350);
-}
-
-function drawTitle(y) {
-  ctx.textAlign = "center";
-  ctx.fillStyle = "#0a0a0a";
-  ctx.font = "76px Impact";
-  ctx.fillText("RUMBLE64", W / 2 + 5, y + 5);
-  ctx.fillStyle = "#f4c44f";
-  ctx.fillText("RUMBLE64", W / 2, y);
+  ctx.fillText("Press Enter / START for main menu", W / 2, 222);
 }
 
 function clamp(value, min, max) {
