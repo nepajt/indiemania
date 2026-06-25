@@ -16,7 +16,7 @@ johnnyAtlas.src = "assets/johnny-toxic-expanded-atlas.png?v=run-row-6-1";
 const joeyAtlas = new Image();
 joeyAtlas.src = "assets/joey-image-atlas.png?v=full-template-1";
 const philAtlas = new Image();
-philAtlas.src = "assets/phil-stamper-atlas.png?v=phil-1";
+philAtlas.src = "assets/phil-stamper-expanded-atlas.png?v=phil-expanded-1";
 const selectPortraits = {
   toxic: loadImage("assets/johnny-toxic-select.png"),
   image: loadImage("assets/joey-image-select.png"),
@@ -526,6 +526,14 @@ function updateMoveMotion(f) {
     f.x = lerp(m.startX, m.endX, eased);
     f.y = lerp(m.startY, m.endY, eased);
     f.air = Math.sin(Math.PI * t) * 112;
+  } else if (m.type === "brainbusterTake") {
+    const liftEnd = 0.54;
+    const dropT = clamp((t - liftEnd) / (1 - liftEnd), 0, 1);
+    const liftT = clamp(t / liftEnd, 0, 1);
+    const verticalX = lerp(m.startX, m.dropX, easeInOut(liftT));
+    f.x = t < liftEnd ? verticalX : m.dropX;
+    f.y = lerp(m.startY, m.endY, eased);
+    f.air = t < liftEnd ? Math.sin(liftT * Math.PI * 0.5) * 132 : (1 - easeInOut(dropT)) * 132;
   } else if (m.type === "powerbombTake") {
     const lift = t < 0.42 ? t / 0.42 : 1 - (t - 0.42) / 0.58;
     f.x = lerp(m.startX, m.endX, eased);
@@ -898,6 +906,21 @@ function createTakeMoveMotion(moveId, attacker, defender, duration) {
   return null;
 }
 
+function createBrainbusterTakeMotion(attacker, defender, duration) {
+  const side = attacker.face || (defender.x >= attacker.x ? 1 : -1);
+  const limits = ringLimitsForY(attacker.y, ringPlayBounds.bodyInset);
+  return {
+    type: "brainbusterTake",
+    duration,
+    startX: defender.x,
+    startY: defender.y,
+    dropX: clamp(attacker.x + side * 8, limits.left, limits.right),
+    endY: clamp(attacker.y + 6, ringPlayBounds.back, ringPlayBounds.front),
+    landingVx: side * 18,
+    landingVy: 0
+  };
+}
+
 function executeIrishWhip(attacker, defender) {
   const side = -(attacker.face || (defender.x >= attacker.x ? 1 : -1));
   const targetY = clamp(defender.y + (attacker.y - defender.y) * 0.35, ringPlayBounds.back + 18, ringPlayBounds.front - 18);
@@ -955,15 +978,30 @@ function isNearRingEdge(f) {
 
 function tryFinisher(attacker, defender) {
   if (!canAct(attacker) || attacker.momentum < 100) return;
+  const isBrainbuster = attacker.id === "phil";
+  const duration = isBrainbuster ? 1.18 : 0.95;
   attacker.state = "finisher";
-  attacker.actionTime = 0.95;
+  attacker.actionTime = duration;
   attacker.actionDuration = attacker.actionTime;
   attacker.action = "finisher";
   attacker.momentum = 0;
   if (inRange(attacker, defender, 64)) {
-    hit(attacker, defender, 34, 0, 1.35, true);
-    defender.down = 4.3;
-    knockAway(attacker, defender, 210);
+    if (isBrainbuster) {
+      defender.state = "suplexTake";
+      defender.action = "suplexTake";
+      defender.actionTime = duration;
+      defender.actionDuration = duration;
+      defender.pendingDown = { duration: 4.3 };
+      defender.downHoldTime = duration + 0.24;
+      defender.moveMotion = createBrainbusterTakeMotion(attacker, defender, duration);
+      defender.vx = 0;
+      defender.vy = 0;
+      hit(attacker, defender, 34, 0, 1.35, false);
+    } else {
+      hit(attacker, defender, 34, 0, 1.35, true);
+      defender.down = 4.3;
+      knockAway(attacker, defender, 210);
+    }
     state.shake = 1;
     state.flash = 1;
     playSound("finisher");
