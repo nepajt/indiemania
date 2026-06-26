@@ -535,6 +535,12 @@ function updateMoveMotion(f) {
     f.x = lerp(m.startX, m.endX, eased);
     f.y = lerp(m.startY, m.endY, eased);
     f.air = Math.sin(Math.PI * t) * 112;
+  } else if (m.type === "bodyslamTake") {
+    const liftT = t < 0.46 ? t / 0.46 : 1 - (t - 0.46) / 0.54;
+    const hang = Math.sin(Math.PI * clamp(liftT, 0, 1));
+    f.x = lerp(m.startX, m.endX, eased);
+    f.y = lerp(m.startY, m.endY, eased);
+    f.air = hang * 76;
   } else if (m.type === "brainbusterTake") {
     const liftEnd = 0.54;
     const dropT = clamp((t - liftEnd) / (1 - liftEnd), 0, 1);
@@ -917,6 +923,18 @@ function createTakeMoveMotion(moveId, attacker, defender, duration) {
       endX: clamp(attacker.x + side * 46, limits.left, limits.right),
       endY: clamp(attacker.y + 6, ringPlayBounds.back, ringPlayBounds.front),
       landingVx: side * 56,
+      landingVy: 0
+    };
+  }
+  if (moveId === "bodyslam") {
+    return {
+      type: "bodyslamTake",
+      duration,
+      startX: defender.x,
+      startY: defender.y,
+      endX: clamp(attacker.x + side * 34, limits.left, limits.right),
+      endY: clamp(attacker.y + 8, ringPlayBounds.back, ringPlayBounds.front),
+      landingVx: side * 38,
       landingVy: 0
     };
   }
