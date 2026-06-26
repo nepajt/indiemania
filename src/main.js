@@ -16,7 +16,7 @@ johnnyAtlas.src = "assets/johnny-toxic-expanded-atlas.png?v=run-row-6-1";
 const joeyAtlas = new Image();
 joeyAtlas.src = "assets/joey-image-atlas.png?v=full-template-1";
 const philAtlas = new Image();
-philAtlas.src = "assets/phil-stamper-expanded-atlas.png?v=phil-expanded-1";
+philAtlas.src = "assets/phil-stamper-expanded-atlas.png?v=phil-expanded-2";
 const selectPortraits = {
   toxic: loadImage("assets/johnny-toxic-select.png"),
   image: loadImage("assets/joey-image-select.png"),
@@ -481,6 +481,15 @@ function updateFighterTimers(f, dt) {
   updateMoveMotion(f);
   updateWhipPivot(f);
 
+  if (f.whip) {
+    const whipPose = f.whip.phase === "return" ? "rebound" : "whipped";
+    f.state = whipPose;
+    f.action = whipPose;
+    f.actionTime = Math.max(f.actionTime, 0.08);
+    f.actionDuration = Math.max(f.actionDuration, 0.08);
+    return;
+  }
+
   if (f.pendingDown && f.actionTime === 0) {
     f.down = Math.max(f.down, f.pendingDown.duration);
     f.pendingDown = null;
@@ -591,9 +600,9 @@ function updateCpu(dt) {
     else if (cpu.momentum >= 100 && d < 70) state.cpuIntent = "finisher";
     else if (playerRebounding && d < 118) state.cpuIntent = Math.random() < 0.55 ? "clothesline" : "bigBoot";
     else if (playerCrowded && Math.random() < 0.72) state.cpuIntent = "retreat";
-    else if (d < 56 && cpu.grappleCooldown === 0 && Math.random() < 0.16) state.cpuIntent = "grapple";
-    else if (d < 82 && Math.random() < 0.26) state.cpuIntent = "kick";
-    else if (d < 72 && Math.random() < 0.58) state.cpuIntent = "punch";
+    else if (d < 60 && cpu.grappleCooldown === 0 && Math.random() < 0.22) state.cpuIntent = "grapple";
+    else if (d < 72 && Math.random() < 0.12) state.cpuIntent = "kick";
+    else if (d < 72 && Math.random() < 0.64) state.cpuIntent = "punch";
     else state.cpuIntent = cpu.stamina < 30 && player.stamina > cpu.stamina ? "retreat" : "approach";
   }
 
@@ -663,6 +672,8 @@ function updateWhipMotion(f, other, dt) {
   f.animTime += dt * 1.85;
   f.stun = Math.max(f.stun, 0.08);
   if (f.whip.phase === "windup") {
+    f.state = "whipped";
+    f.action = "whipped";
     const source = f.whip.source || other;
     const side = f.whip.side || Math.sign(f.face || 1);
     const limits = ringLimitsForY(source.y, ringPlayBounds.bodyInset);
@@ -674,6 +685,8 @@ function updateWhipMotion(f, other, dt) {
     if (f.whip.timer >= f.whip.releaseAt) {
       f.whip.phase = "out";
       f.whip.timer = 0;
+      f.state = "whipped";
+      f.action = "whipped";
       f.vx = side * 430;
       f.vy = 0;
     }
@@ -682,6 +695,10 @@ function updateWhipMotion(f, other, dt) {
 
   const limits = ringLimitsForY(f.y);
   const targetSide = f.whip.side || Math.sign(f.vx || f.face || 1);
+  if (f.whip.phase === "out") {
+    f.state = "whipped";
+    f.action = "whipped";
+  }
   const ropeX = targetSide > 0 ? limits.right : limits.left;
   const hitSide = targetSide > 0 ? f.x >= ropeX - 8 : f.x <= ropeX + 8;
 

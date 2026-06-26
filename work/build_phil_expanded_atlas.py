@@ -21,6 +21,10 @@ ROWS = [
     6, 6, 7, 7, 6, 6,
 ]
 
+FRAME_REPEATS = {
+    10: {4: 0, 5: 1},
+}
+
 
 def main():
     sheet = Image.open(SOURCE).convert("RGBA")
@@ -30,7 +34,8 @@ def main():
         source_y = ROW_Y + row * (CELL_H + GAP_Y)
         dest_y = row * CELL_H
         for frame in range(frame_count):
-            source_x = MARGIN_X + frame * (CELL_W + GAP_X)
+            source_frame = FRAME_REPEATS.get(row, {}).get(frame, frame)
+            source_x = MARGIN_X + source_frame * (CELL_W + GAP_X)
             cell = sheet.crop((source_x, source_y, source_x + CELL_W, source_y + CELL_H))
             atlas.alpha_composite(cell, (frame * CELL_W, dest_y))
 
