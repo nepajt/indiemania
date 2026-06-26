@@ -71,6 +71,12 @@ const JOHNNY_ANIMS = {
   suplexTake: { row: 23, frames: 6, fps: 8, once: true }
 };
 
+const PHIL_ANIMS = {
+  ...JOHNNY_ANIMS,
+  run: { row: 11, frameOffset: 1, frames: 5, fps: 12 },
+  whipped: { row: 11, frameOffset: 1, frames: 5, fps: 11 }
+};
+
 const ANIM_FALLBACKS = {
   grappleHold: "grapple",
   grappled: "grapple",
@@ -1749,7 +1755,8 @@ function getSpriteAtlas(f) {
 
 function drawSpriteWrestler(f, p, scale, atlas) {
   const pose = resolveSpritePose(f.state, atlas);
-  const anim = JOHNNY_ANIMS[pose];
+  const anims = f.sprite === "phil" ? PHIL_ANIMS : JOHNNY_ANIMS;
+  const anim = anims[pose] || JOHNNY_ANIMS[pose];
   const holdLastFrame = ["pin", "pinned", "down", "rise"].includes(pose);
   const loopTime = pose === "walk" || pose === "run" || pose === "rebound" || pose === "whipped"
     ? f.animTime
